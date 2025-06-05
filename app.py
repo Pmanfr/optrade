@@ -42,7 +42,7 @@ cop_range = st.slider("🎯 COP Range", min_value=0.0, max_value=1.0, value=(0.2
 if 'all_trades' not in st.session_state:
     st.session_state.all_trades = []
 
-if st.button("Find Trades"):
+if st.button("Generate Report"):
     st.session_state.all_trades.clear()
     companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU"]
 
