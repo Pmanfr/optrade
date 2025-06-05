@@ -34,9 +34,9 @@ class Trade:
 # Initialize page
 st.title("🔍 Live Options Trade Scanner")
 
-# Add ROI and COP sliders before fetching trades
-min_roi = st.slider("📈 Minimum ROI", min_value=0.0, max_value=1.0, value=0.20, step=0.01)
-min_cop = st.slider("🎯 Minimum COP (Chance of Profitability)", min_value=0.0, max_value=1.0, value=0.20, step=0.01)
+# ROI and COP range sliders
+roi_range = st.slider("📈 ROI Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
+cop_range = st.slider("🎯 COP Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
 
 # Use session_state to store trades
 if 'all_trades' not in st.session_state:
@@ -65,7 +65,7 @@ if st.button("Find Trades"):
                     iv = chain_data['iv'][i]
                     COP = black_scholes_put(current_price, strike, bid, dte, iv)
 
-                    if ROI > min_roi and COP > min_cop:
+                    if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
                         trade = Trade(
                             optionSymbol=chain_data['optionSymbol'][i],
                             underlying=chain_data['underlying'][i],
