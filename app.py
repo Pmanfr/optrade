@@ -44,7 +44,7 @@ if 'all_trades' not in st.session_state:
 
 if st.button("Find Trades"):
     st.session_state.all_trades.clear()
-    companies = ["TSLA", "AMZN", "AMD"]
+    companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU"]
 
     for company in companies:
         try:
