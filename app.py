@@ -85,15 +85,34 @@ def get_current_price(symbol):
     try:
         current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{symbol}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
         quote_data = requests.get(current_price_url).json()
-        return quote_data["mid"][0]
-    except:
+        
+        # Debug: Print the response to see structure
+        print(f"API Response for {symbol}: {quote_data}")
+        
+        # Try different possible price fields
+        if "mid" in quote_data and quote_data["mid"]:
+            return quote_data["mid"][0]
+        elif "last" in quote_data and quote_data["last"]:
+            return quote_data["last"][0]
+        elif "close" in quote_data and quote_data["close"]:
+            return quote_data["close"][0]
+        elif "ask" in quote_data and "bid" in quote_data:
+            # Calculate mid price from bid/ask
+            if quote_data["ask"] and quote_data["bid"]:
+                ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
+                bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
+                return (ask + bid) / 2
+        
+        return None
+    except Exception as e:
+        print(f"Error getting price for {symbol}: {e}")
         return None
 
 def get_earnings_date(symbol):
     """Get next earnings date for a symbol using API Ninjas"""
     try:
         # You'll need to get a free API key from https://www.api-ninjas.com/
-        api_key = "eZQ1PiKHaSazbMk9zIcYOQ==L80sp50rXpuPuFWx"  # Replace with your actual API key
+        api_key = "YOUR_API_NINJAS_KEY"  # Replace with your actual API key
         headers = {
             'X-Api-Key': api_key
         }
@@ -225,7 +244,7 @@ def scanner_tab():
 
     if st.button("Generate Report"):
         st.session_state.all_trades.clear()
-        companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU", "ABM", "MANU"]
+        companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU"]
 
         for company in companies:
             try:
