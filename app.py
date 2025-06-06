@@ -115,7 +115,8 @@ def get_earnings_date(symbol):
         headers = {
             'X-Api-Key': api_key
         }
-        url = f"https://api.api-ninjas.com/v1/earningscalendar?ticker={symbol}"
+        # FIXED: Added show_upcoming=true to get future earnings dates
+        url = f"https://api.api-ninjas.com/v1/earningscalendar?ticker={symbol}&show_upcoming=true"
         
         print(f"Requesting earnings for {symbol}: {url}")  # Debug print
         
@@ -136,23 +137,15 @@ def get_earnings_date(symbol):
                 for earning in data:
                     print(f"Processing earning record: {earning}")  # Debug print
                     
-                    # Try different possible date fields
-                    date_field = None
-                    if 'pricedate' in earning and earning['pricedate']:
-                        date_field = earning['pricedate']
-                    elif 'date' in earning and earning['date']:
+                    # FIXED: Use the correct field name 'date'
+                    if 'date' in earning and earning['date']:
                         date_field = earning['date']
-                    elif 'earnings_date' in earning and earning['earnings_date']:
-                        date_field = earning['earnings_date']
-                    
-                    if date_field:
+                        
                         try:
-                            # Handle different date formats
-                            if 'T' in date_field:  # ISO format with time
-                                earnings_date = datetime.fromisoformat(date_field.replace('Z', '+00:00'))
-                            else:  # Date only format
-                                earnings_date = datetime.strptime(date_field, '%Y-%m-%d')
+                            # FIXED: Handle the date format properly (YYYY-MM-DD)
+                            earnings_date = datetime.strptime(date_field, '%Y-%m-%d')
                             
+                            # Only consider future dates
                             if earnings_date.date() >= current_date.date():
                                 upcoming_earnings.append(earnings_date)
                                 print(f"Found upcoming earnings for {symbol}: {earnings_date}")
