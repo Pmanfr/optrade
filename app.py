@@ -112,7 +112,7 @@ def get_earnings_date(symbol):
     """Get next earnings date for a symbol using API Ninjas"""
     try:
         # You'll need to get a free API key from https://www.api-ninjas.com/
-        api_key = "YOUR_API_NINJAS_KEY"  # Replace with your actual API key
+        api_key = "eZQ1PiKHaSazbMk9zIcYOQ==L80sp50rXpuPuFWx"  # Replace with your actual API key
         headers = {
             'X-Api-Key': api_key
         }
