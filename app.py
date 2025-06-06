@@ -53,7 +53,7 @@ if st.button("Generate Report"):
             current_price = quote_data["mid"][0]
             st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f})")
 
-            options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=1&minBid=0.20&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+            options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=7&minBid=0.20&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
             chain_data = requests.get(options_chain_url).json()
 
             if chain_data.get("s") == "ok":
