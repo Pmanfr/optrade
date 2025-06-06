@@ -1,8 +1,11 @@
 import streamlit as st
 import requests
 import math
+import os
+import json
 from datetime import datetime, timedelta
 from scipy.stats import norm
+import streamlit_authenticator as stauth
 
 # Black-Scholes formula
 def black_scholes_put(current_price, strike, bid, dte, iv):
@@ -32,147 +35,191 @@ class Trade:
                 f"In The Money: {self.inTheMoney}, DTE: {self.dte}, IV: {self.iv}, "
                 f"ROI: {self.ROI:.3f}, COP: {self.COP:.3f}, x: {self.x:.3f}")
 
-# Streamlit app title
-st.title("🔍 Live Options Trade Scanner")
+# Authentication setup
+names = ['Pranav']
+usernames = ['pranav']
+passwords = ['123']  # Replace with hashed passwords in production
+hashed_pw = stauth.Hasher(passwords).generate()
 
-# ROI and COP range sliders
-roi_range = st.slider("📈 ROI Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
-cop_range = st.slider("🎯 COP Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
+authenticator = stauth.Authenticate(
+    {'usernames': {
+        usernames[0]: {'name': names[0], 'password': hashed_pw[0]}
+    }},
+    'some_cookie_name', 'some_signature_key', cookie_expiry_days=30
+)
 
-# Session state initialization
-if 'all_trades' not in st.session_state:
-    st.session_state.all_trades = []
-if 'watchlist' not in st.session_state:
-    st.session_state.watchlist = []
-if 'watchlist_dates' not in st.session_state:
-    st.session_state.watchlist_dates = []
+name, auth_status, username = authenticator.login('Login', 'main')
 
-# Main trading logic
-if st.button("Generate Report"):
-    st.session_state.all_trades.clear()
-    companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU"]
+if auth_status is False:
+    st.error('Incorrect username or password')
+elif auth_status is None:
+    st.warning('Please enter your username and password')
+elif auth_status:
+    authenticator.logout('Logout', 'sidebar')
+    st.sidebar.success(f"Logged in as {name}")
 
-    for company in companies:
-        try:
-            current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-            quote_data = requests.get(current_price_url).json()
-            current_price = quote_data["mid"][0]
-            st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f})")
+    # Watchlist persistence
+    user_file = f"{username}_watchlist.json"
 
-            options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=7&minBid=0.20&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-            chain_data = requests.get(options_chain_url).json()
+    def load_watchlist():
+        if os.path.exists(user_file):
+            with open(user_file, "r") as f:
+                return json.load(f)
+        return [], []
 
-            if chain_data.get("s") == "ok":
-                for i in range(len(chain_data['strike'])):
-                    strike = chain_data['strike'][i]
-                    bid = chain_data['bid'][i]
-                    ROI = round((bid * 100) / strike, 3)
-                    dte = chain_data['dte'][i]
-                    iv = chain_data['iv'][i]
-                    COP = black_scholes_put(current_price, strike, bid, dte, iv)
+    def save_watchlist(watchlist, watchlist_dates):
+        with open(user_file, "w") as f:
+            json.dump({"watchlist": watchlist, "dates": watchlist_dates}, f, default=str)
 
-                    if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
-                        trade = Trade(
-                            optionSymbol=chain_data['optionSymbol'][i],
-                            underlying=chain_data['underlying'][i],
-                            strike=strike,
-                            bid=bid,
-                            side=chain_data['side'][i],
-                            inTheMoney=chain_data['inTheMoney'][i],
-                            dte=dte,
-                            iv=iv,
-                            ROI=ROI,
-                            COP=COP
-                        )
-                        st.session_state.all_trades.append(trade)
+    def serialize_trade(trade):
+        return trade.__dict__
+
+    def deserialize_trade(data):
+        return Trade(**data)
+
+    # ROI and COP range sliders
+    st.title("🔍 Live Options Trade Scanner")
+    roi_range = st.slider("📈 ROI Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
+    cop_range = st.slider("🎯 COP Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
+
+    # Load persisted watchlist
+    if 'watchlist' not in st.session_state:
+        raw_watchlist, raw_dates = load_watchlist()
+        st.session_state.watchlist = [deserialize_trade(t) for t in raw_watchlist]
+        st.session_state.watchlist_dates = [datetime.strptime(d, '%Y-%m-%d').date() for d in raw_dates]
+
+    if 'all_trades' not in st.session_state:
+        st.session_state.all_trades = []
+
+    # Main logic
+    if st.button("Generate Report"):
+        st.session_state.all_trades.clear()
+        companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU"]
+
+        for company in companies:
+            try:
+                current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=YOUR_TOKEN"
+                quote_data = requests.get(current_price_url).json()
+                current_price = quote_data["mid"][0]
+                st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f})")
+
+                options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=1&minBid=0.20&side=put&range=otm&token=YOUR_TOKEN"
+                chain_data = requests.get(options_chain_url).json()
+
+                if chain_data.get("s") == "ok":
+                    for i in range(len(chain_data['strike'])):
+                        strike = chain_data['strike'][i]
+                        bid = chain_data['bid'][i]
+                        ROI = round((bid * 100) / strike, 3)
+                        dte = chain_data['dte'][i]
+                        iv = chain_data['iv'][i]
+                        COP = black_scholes_put(current_price, strike, bid, dte, iv)
+
+                        if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
+                            trade = Trade(
+                                optionSymbol=chain_data['optionSymbol'][i],
+                                underlying=chain_data['underlying'][i],
+                                strike=strike,
+                                bid=bid,
+                                side=chain_data['side'][i],
+                                inTheMoney=chain_data['inTheMoney'][i],
+                                dte=dte,
+                                iv=iv,
+                                ROI=ROI,
+                                COP=COP
+                            )
+                            st.session_state.all_trades.append(trade)
+                else:
+                    st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
+
+            except Exception as e:
+                st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+
+    # Display and sort trades
+    if st.session_state.all_trades:
+        st.markdown("---")
+        sort_filter = st.selectbox("🔃 Sort trades by:", ["ROI", "COP", "x"], index=0)
+        current_company = None
+        trades_buffer = []
+
+        for item in st.session_state.all_trades:
+            if isinstance(item, str):
+                if trades_buffer:
+                    if sort_filter == "ROI":
+                        trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
+                    elif sort_filter == "COP":
+                        trades_buffer.sort(key=lambda t: t.COP, reverse=True)
+                    elif sort_filter == "x":
+                        trades_buffer.sort(key=lambda t: t.x, reverse=True)
+                    for trade in trades_buffer:
+                        st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
+                        if st.button(f"➕ Add to Watchlist ({trade.optionSymbol})"):
+                            st.session_state.watchlist.append(trade)
+                            st.session_state.watchlist_dates.append(datetime.now().date())
+                            save_watchlist([serialize_trade(t) for t in st.session_state.watchlist],
+                                           [d.strftime('%Y-%m-%d') for d in st.session_state.watchlist_dates])
+                    trades_buffer = []
+                st.markdown(item)
             else:
-                st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
+                trades_buffer.append(item)
 
-        except Exception as e:
-            st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+        if trades_buffer:
+            if sort_filter == "ROI":
+                trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
+            elif sort_filter == "COP":
+                trades_buffer.sort(key=lambda t: t.COP, reverse=True)
+            elif sort_filter == "x":
+                trades_buffer.sort(key=lambda t: t.x, reverse=True)
+            for trade in trades_buffer:
+                st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
+                if st.button(f"➕ Add to Watchlist ({trade.optionSymbol})"):
+                    st.session_state.watchlist.append(trade)
+                    st.session_state.watchlist_dates.append(datetime.now().date())
+                    save_watchlist([serialize_trade(t) for t in st.session_state.watchlist],
+                                   [d.strftime('%Y-%m-%d') for d in st.session_state.watchlist_dates])
 
-# Display and sort trades
-if st.session_state.all_trades:
+    # Watchlist Section
     st.markdown("---")
-    sort_filter = st.selectbox("🔃 Sort trades by:", ["ROI", "COP", "x"], index=0)
+    if st.button("📋 View Watchlist"):
+        st.markdown("## 👀 Watchlist")
+        updated_watchlist = []
+        updated_dates = []
 
-    current_company = None
-    trades_buffer = []
+        for i, trade in enumerate(st.session_state.watchlist):
+            added_date = st.session_state.watchlist_dates[i]
+            days_passed = (datetime.now().date() - added_date).days
+            remaining_dte = max(trade.dte - days_passed, 0)
 
-    for item in st.session_state.all_trades:
-        if isinstance(item, str):
-            if trades_buffer:
-                if sort_filter == "ROI":
-                    trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
-                elif sort_filter == "COP":
-                    trades_buffer.sort(key=lambda t: t.COP, reverse=True)
-                elif sort_filter == "x":
-                    trades_buffer.sort(key=lambda t: t.x, reverse=True)
+            try:
+                quote_url = f"https://api.marketdata.app/v1/stocks/quotes/{trade.underlying}/?extended=false&token=YOUR_TOKEN"
+                current_price = requests.get(quote_url).json()["mid"][0]
+            except:
+                current_price = None
 
-                for trade in trades_buffer:
-                    st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
-                    if st.button(f"➕ Add to Watchlist ({trade.optionSymbol})"):
-                        st.session_state.watchlist.append(trade)
-                        st.session_state.watchlist_dates.append(datetime.now().date())
-                trades_buffer = []
-            st.markdown(item)
-        else:
-            trades_buffer.append(item)
+            result = "⏳ Still Active"
+            color = "black"
+            if remaining_dte == 0 and current_price is not None:
+                if current_price > trade.strike:
+                    result = f"❌ Loss: ${int((current_price - trade.strike) * 100)}"
+                    color = "red"
+                else:
+                    result = "✅ Win"
+                    color = "green"
 
-    if trades_buffer:
-        if sort_filter == "ROI":
-            trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
-        elif sort_filter == "COP":
-            trades_buffer.sort(key=lambda t: t.COP, reverse=True)
-        elif sort_filter == "x":
-            trades_buffer.sort(key=lambda t: t.x, reverse=True)
-
-        for trade in trades_buffer:
             st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
-            if st.button(f"➕ Add to Watchlist ({trade.optionSymbol})"):
-                st.session_state.watchlist.append(trade)
-                st.session_state.watchlist_dates.append(datetime.now().date())
+            st.markdown(f"<span style='color:{color}; font-weight:bold'>{result}</span>", unsafe_allow_html=True)
 
-# Watchlist Section
-st.markdown("---")
-if st.button("📋 View Watchlist"):
-    st.markdown("## 👀 Watchlist")
-    updated_watchlist = []
-    updated_dates = []
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"DTE Left: {remaining_dte}")
+            with col2:
+                if st.button(f"❌ Remove ({trade.optionSymbol})"):
+                    continue
 
-    for i, trade in enumerate(st.session_state.watchlist):
-        added_date = st.session_state.watchlist_dates[i]
-        days_passed = (datetime.now().date() - added_date).days
-        remaining_dte = max(trade.dte - days_passed, 0)
+            updated_watchlist.append(trade)
+            updated_dates.append(added_date)
 
-        try:
-            quote_url = f"https://api.marketdata.app/v1/stocks/quotes/{trade.underlying}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-            current_price = requests.get(quote_url).json()["mid"][0]
-        except:
-            current_price = None
-
-        result = "⏳ Still Active"
-        color = "black"
-        if remaining_dte == 0 and current_price is not None:
-            if current_price > trade.strike:
-                result = f"❌ Loss: ${int((current_price - trade.strike) * 100)}"
-                color = "red"
-            else:
-                result = "✅ Win"
-                color = "green"
-
-        st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
-        st.markdown(f"<span style='color:{color}; font-weight:bold'>{result}</span>", unsafe_allow_html=True)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"DTE Left: {remaining_dte}")
-        with col2:
-            if st.button(f"❌ Remove ({trade.optionSymbol})"):
-                continue  # Skip appending to updated lists, effectively removing it
-
-        updated_watchlist.append(trade)
-        updated_dates.append(added_date)
-
-    st.session_state.watchlist = updated_watchlist
-    st.session_state.watchlist_dates = updated_dates
+        st.session_state.watchlist = updated_watchlist
+        st.session_state.watchlist_dates = updated_dates
+        save_watchlist([serialize_trade(t) for t in updated_watchlist],
+                       [d.strftime('%Y-%m-%d') for d in updated_dates])
