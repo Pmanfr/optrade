@@ -6,42 +6,30 @@ import json
 from datetime import datetime, timedelta
 from scipy.stats import norm
 from streamlit_authenticator import Hasher, Authenticate
+import streamlit as st
 
+# Simple hardcoded username/password
+USERNAME = "pranav"
+PASSWORD = "123"
 
-# --- Authentication Setup ---
-names = ['Pranav']
-usernames = ['pranav']
-passwords = ['123']  # In production, hash these first and hardcode the hashed list
+def login():
+    st.title("Login")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if username == USERNAME and password == PASSWORD:
+            st.session_state["logged_in"] = True
+            st.session_state["username"] = username
+        else:
+            st.error("Incorrect username or password")
 
-# Generate hashed passwords (this is fine for dev, not prod)
-hashed_passwords = Hasher(passwords).generate()
-
-credentials = {
-    "usernames": {
-        usernames[0]: {
-            "name": names[0],
-            "password": hashed_passwords[0]
-        }
-    }
-}
-
-authenticator = Authenticate(
-    {'usernames': {
-        usernames[0]: {'name': names[0], 'password': hashed_passwords[0]}
-    }},
-    'some_cookie_name', 'some_signature_key', cookie_expiry_days=30
-)
-
-
-name, authentication_status, username = authenticator.login("Login", "main")
-
-if authentication_status is False:
-    st.error("Incorrect username or password")
-elif authentication_status is None:
-    st.warning("Please enter your username and password")
-elif authentication_status:
-    authenticator.logout("Logout", "sidebar")
-    st.sidebar.success(f"Logged in as {name}")
+if "logged_in" not in st.session_state:
+    login()
+elif st.session_state["logged_in"]:
+    st.sidebar.write(f"Logged in as {st.session_state['username']}")
+    if st.sidebar.button("Logout"):
+        st.session_state.clear()
+        st.experimental_rerun()
 
     # --- Main App Code Starts Here ---
 
