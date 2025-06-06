@@ -111,27 +111,70 @@ def get_current_price(symbol):
 def get_earnings_date(symbol):
     """Get next earnings date for a symbol using API Ninjas"""
     try:
-        # You'll need to get a free API key from https://www.api-ninjas.com/
-        api_key = "eZQ1PiKHaSazbMk9zIcYOQ==L80sp50rXpuPuFWx"  # Replace with your actual API key
+        api_key = "eZQ1PiKHaSazbMk9zIcYOQ==L80sp50rXpuPuFWx"
         headers = {
             'X-Api-Key': api_key
         }
         url = f"https://api.api-ninjas.com/v1/earningscalendar?ticker={symbol}"
+        
+        print(f"Requesting earnings for {symbol}: {url}")  # Debug print
+        
         response = requests.get(url, headers=headers)
+        
+        print(f"Response status for {symbol}: {response.status_code}")  # Debug print
+        print(f"Response content for {symbol}: {response.text}")  # Debug print
         
         if response.status_code == 200:
             data = response.json()
+            print(f"Parsed data for {symbol}: {data}")  # Debug print
+            
             if data and len(data) > 0:
                 # Find the next upcoming earnings date
+                current_date = datetime.now()
+                upcoming_earnings = []
+                
                 for earning in data:
-                    if earning.get('pricedate'):  # This is the earnings date
-                        earnings_date = datetime.strptime(earning['pricedate'], '%Y-%m-%d')
-                        if earnings_date >= datetime.now():
-                            return earnings_date
+                    print(f"Processing earning record: {earning}")  # Debug print
+                    
+                    # Try different possible date fields
+                    date_field = None
+                    if 'pricedate' in earning and earning['pricedate']:
+                        date_field = earning['pricedate']
+                    elif 'date' in earning and earning['date']:
+                        date_field = earning['date']
+                    elif 'earnings_date' in earning and earning['earnings_date']:
+                        date_field = earning['earnings_date']
+                    
+                    if date_field:
+                        try:
+                            # Handle different date formats
+                            if 'T' in date_field:  # ISO format with time
+                                earnings_date = datetime.fromisoformat(date_field.replace('Z', '+00:00'))
+                            else:  # Date only format
+                                earnings_date = datetime.strptime(date_field, '%Y-%m-%d')
+                            
+                            if earnings_date.date() >= current_date.date():
+                                upcoming_earnings.append(earnings_date)
+                                print(f"Found upcoming earnings for {symbol}: {earnings_date}")
+                        except ValueError as e:
+                            print(f"Date parsing error for {symbol}: {e}")
+                            continue
+                
+                if upcoming_earnings:
+                    # Return the earliest upcoming earnings date
+                    return min(upcoming_earnings)
+                else:
+                    print(f"No upcoming earnings found for {symbol}")
+            else:
+                print(f"No earnings data returned for {symbol}")
+        else:
+            print(f"API request failed for {symbol}: Status {response.status_code}, Response: {response.text}")
+        
         return None
     except Exception as e:
         print(f"Error fetching earnings for {symbol}: {e}")
         return None
+
 
 def check_earnings_before_expiry(symbol, expiry_date):
     """Check if earnings occur before or on expiry date"""
