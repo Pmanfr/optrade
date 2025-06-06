@@ -28,8 +28,10 @@ if "logged_in" not in st.session_state:
 elif st.session_state["logged_in"]:
     st.sidebar.write(f"Logged in as {st.session_state['username']}")
     if st.sidebar.button("Logout"):
-        st.session_state.clear()
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.experimental_rerun()
+
 
     # --- Main App Code Starts Here ---
 
