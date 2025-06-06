@@ -287,7 +287,7 @@ def scanner_tab():
 
     if st.button("Generate Report"):
         st.session_state.all_trades.clear()
-        companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU", "ABM", "MANU"]
+        companies = ["TSLA", "GME", "PLAY", "AMZN", "AMD", "PLTR", "RBLX", "LULU", "ABM", "MANU"]
 
         for company in companies:
             try:
@@ -306,7 +306,7 @@ def scanner_tab():
                 
                 st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f}){earnings_alert}")
 
-                options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=7&minBid=0.20&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=7&minBid=0.10&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                 chain_data = requests.get(options_chain_url).json()
 
                 if chain_data.get("s") == "ok":
