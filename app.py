@@ -89,6 +89,38 @@ def get_current_price(symbol):
     except:
         return None
 
+def get_earnings_date(symbol):
+    """Get next earnings date for a symbol using API Ninjas"""
+    try:
+        # You'll need to get a free API key from https://www.api-ninjas.com/
+        api_key = "eZQ1PiKHaSazbMk9zIcYOQ==L80sp50rXpuPuFWx"  # Replace with your actual API key
+        headers = {
+            'X-Api-Key': api_key
+        }
+        url = f"https://api.api-ninjas.com/v1/earningscalendar?ticker={symbol}"
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0:
+                # Find the next upcoming earnings date
+                for earning in data:
+                    if earning.get('pricedate'):  # This is the earnings date
+                        earnings_date = datetime.strptime(earning['pricedate'], '%Y-%m-%d')
+                        if earnings_date >= datetime.now():
+                            return earnings_date
+        return None
+    except Exception as e:
+        print(f"Error fetching earnings for {symbol}: {e}")
+        return None
+
+def check_earnings_before_expiry(symbol, expiry_date):
+    """Check if earnings occur before or on expiry date"""
+    earnings_date = get_earnings_date(symbol)
+    if earnings_date and earnings_date <= expiry_date:
+        return True, earnings_date
+    return False, None
+
 def calculate_pnl(trade_data, current_price):
     strike = trade_data['strike']
     bid = trade_data['bid']
@@ -200,7 +232,17 @@ def scanner_tab():
                 current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                 quote_data = requests.get(current_price_url).json()
                 current_price = quote_data["mid"][0]
-                st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f})")
+                
+                # Check for earnings before typical expiry (7 days from now)
+                typical_expiry = datetime.now() + timedelta(days=7)
+                has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
+                
+                earnings_alert = ""
+                if has_earnings:
+                    earnings_str = earnings_date.strftime('%m/%d')
+                    earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+                
+                st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f}){earnings_alert}")
 
                 options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=7&minBid=0.20&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                 chain_data = requests.get(options_chain_url).json()
@@ -312,7 +354,29 @@ def watchlist_tab():
         by_underlying[underlying].append(trade)
     
     for underlying, trades in by_underlying.items():
-        st.subheader(f"📈 {underlying}")
+        # Check for earnings alert for this underlying
+        current_price = get_current_price(underlying)
+        if current_price:
+            # Check if any trade has earnings before expiry
+            has_earnings_alert = False
+            earliest_earnings = None
+            
+            for trade in trades:
+                expiry_date = datetime.fromisoformat(trade['expiration_date'])
+                has_earnings, earnings_date = check_earnings_before_expiry(underlying, expiry_date)
+                if has_earnings:
+                    has_earnings_alert = True
+                    if earliest_earnings is None or earnings_date < earliest_earnings:
+                        earliest_earnings = earnings_date
+            
+            earnings_alert = ""
+            if has_earnings_alert and earliest_earnings:
+                earnings_str = earliest_earnings.strftime('%m/%d')
+                earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+            
+            st.subheader(f"📈 {underlying} (${current_price:.2f}){earnings_alert}")
+        else:
+            st.subheader(f"📈 {underlying}")
         
         for i, trade in enumerate(trades):
             col1, col2 = st.columns([4, 1])
@@ -357,10 +421,18 @@ def pnl_tracker_tab():
             st.warning(f"Could not fetch current price for {trade['underlying']}")
             continue
         
+        # Check for earnings before expiry
+        has_earnings, earnings_date = check_earnings_before_expiry(trade['underlying'], expiry_date)
+        
         col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
         
         with col1:
-            st.write(f"**{trade['optionSymbol']}**")
+            earnings_warning = ""
+            if has_earnings and days_to_expiry > 0:  # Only show for active positions
+                earnings_str = earnings_date.strftime('%m/%d')
+                earnings_warning = f" ⚠️ Earnings {earnings_str}"
+            
+            st.write(f"**{trade['optionSymbol']}**{earnings_warning}")
             st.write(f"Strike: ${trade['strike']} | Current: ${current_price:.2f}")
         
         with col2:
