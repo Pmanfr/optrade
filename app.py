@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import math
+from datetime import datetime, timedelta
 from scipy.stats import norm
 
 # Black-Scholes formula
@@ -31,17 +32,22 @@ class Trade:
                 f"In The Money: {self.inTheMoney}, DTE: {self.dte}, IV: {self.iv}, "
                 f"ROI: {self.ROI:.3f}, COP: {self.COP:.3f}, x: {self.x:.3f}")
 
-# Initialize page
+# Streamlit app title
 st.title("🔍 Live Options Trade Scanner")
 
 # ROI and COP range sliders
 roi_range = st.slider("📈 ROI Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
 cop_range = st.slider("🎯 COP Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
 
-# Use session_state to store trades
+# Session state initialization
 if 'all_trades' not in st.session_state:
     st.session_state.all_trades = []
+if 'watchlist' not in st.session_state:
+    st.session_state.watchlist = []
+if 'watchlist_dates' not in st.session_state:
+    st.session_state.watchlist_dates = []
 
+# Main trading logic
 if st.button("Generate Report"):
     st.session_state.all_trades.clear()
     companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU"]
@@ -85,7 +91,7 @@ if st.button("Generate Report"):
         except Exception as e:
             st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
 
-# If trades have been found, allow sorting/filtering
+# Display and sort trades
 if st.session_state.all_trades:
     st.markdown("---")
     sort_filter = st.selectbox("🔃 Sort trades by:", ["ROI", "COP", "x"], index=0)
@@ -105,9 +111,11 @@ if st.session_state.all_trades:
 
                 for trade in trades_buffer:
                     st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
+                    if st.button(f"➕ Add to Watchlist ({trade.optionSymbol})"):
+                        st.session_state.watchlist.append(trade)
+                        st.session_state.watchlist_dates.append(datetime.now().date())
                 trades_buffer = []
-
-            st.markdown(item)  # Print the company header
+            st.markdown(item)
         else:
             trades_buffer.append(item)
 
@@ -121,3 +129,50 @@ if st.session_state.all_trades:
 
         for trade in trades_buffer:
             st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
+            if st.button(f"➕ Add to Watchlist ({trade.optionSymbol})"):
+                st.session_state.watchlist.append(trade)
+                st.session_state.watchlist_dates.append(datetime.now().date())
+
+# Watchlist Section
+st.markdown("---")
+if st.button("📋 View Watchlist"):
+    st.markdown("## 👀 Watchlist")
+    updated_watchlist = []
+    updated_dates = []
+
+    for i, trade in enumerate(st.session_state.watchlist):
+        added_date = st.session_state.watchlist_dates[i]
+        days_passed = (datetime.now().date() - added_date).days
+        remaining_dte = max(trade.dte - days_passed, 0)
+
+        try:
+            quote_url = f"https://api.marketdata.app/v1/stocks/quotes/{trade.underlying}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+            current_price = requests.get(quote_url).json()["mid"][0]
+        except:
+            current_price = None
+
+        result = "⏳ Still Active"
+        color = "black"
+        if remaining_dte == 0 and current_price is not None:
+            if current_price > trade.strike:
+                result = f"❌ Loss: ${int((current_price - trade.strike) * 100)}"
+                color = "red"
+            else:
+                result = "✅ Win"
+                color = "green"
+
+        st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
+        st.markdown(f"<span style='color:{color}; font-weight:bold'>{result}</span>", unsafe_allow_html=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"DTE Left: {remaining_dte}")
+        with col2:
+            if st.button(f"❌ Remove ({trade.optionSymbol})"):
+                continue  # Skip appending to updated lists, effectively removing it
+
+        updated_watchlist.append(trade)
+        updated_dates.append(added_date)
+
+    st.session_state.watchlist = updated_watchlist
+    st.session_state.watchlist_dates = updated_dates
