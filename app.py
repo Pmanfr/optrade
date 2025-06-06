@@ -8,7 +8,6 @@ from scipy.stats import norm
 from streamlit_authenticator import Hasher, Authenticate
 import streamlit as st
 
-# Simple hardcoded username/password
 USERNAME = "pranav"
 PASSWORD = "123"
 
@@ -20,6 +19,7 @@ def login():
         if username == USERNAME and password == PASSWORD:
             st.session_state["logged_in"] = True
             st.session_state["username"] = username
+            st.experimental_rerun()
         else:
             st.error("Incorrect username or password")
 
@@ -31,6 +31,7 @@ elif st.session_state["logged_in"]:
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.experimental_rerun()
+
 
 
     # --- Main App Code Starts Here ---
