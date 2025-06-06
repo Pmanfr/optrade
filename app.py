@@ -62,7 +62,8 @@ elif st.session_state["logged_in"]:
                     f"ROI: {self.ROI:.3f}, COP: {self.COP:.3f}, x: {self.x:.3f}")
 
     # Watchlist file per user
-    user_file = f"{username}_watchlist.json"
+    user_file = f"{st.session_state['username']}_watchlist.json"
+
 
     def load_watchlist():
         if os.path.exists(user_file):
