@@ -11,28 +11,36 @@ import streamlit as st
 USERNAME = "pranav"
 PASSWORD = "123"
 
+# --- Login Page ---
 def login():
     st.title("Login")
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
-    if st.button("Login"):
+    login_clicked = st.button("Login")
+
+    if login_clicked:
         if username == USERNAME and password == PASSWORD:
-            st.session_state["logged_in"] = True
-            st.session_state["username"] = username
+            st.session_state.logged_in = True
+            st.session_state.username = username
             st.experimental_rerun()
         else:
             st.error("Incorrect username or password")
 
+# --- App Entry Point ---
 if "logged_in" not in st.session_state:
     login()
-elif st.session_state["logged_in"]:
-    st.sidebar.write(f"Logged in as {st.session_state['username']}")
-    if st.sidebar.button("Logout"):
+elif st.session_state.logged_in:
+    st.sidebar.write(f"Logged in as {st.session_state.username}")
+
+    logout_clicked = st.sidebar.button("Logout")
+    if logout_clicked:
+        # Set a flag to logout
+        st.session_state.logout_flag = True
+
+    if st.session_state.get("logout_flag"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.experimental_rerun()
-
-
 
     # --- Main App Code Starts Here ---
 
