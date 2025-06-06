@@ -5,7 +5,8 @@ import os
 import json
 from datetime import datetime, timedelta
 from scipy.stats import norm
-import streamlit_authenticator as stauth
+from streamlit_authenticator import Hasher, Authenticate
+
 
 # --- Authentication Setup ---
 names = ['Pranav']
@@ -13,7 +14,7 @@ usernames = ['pranav']
 passwords = ['123']  # In production, hash these first and hardcode the hashed list
 
 # Generate hashed passwords (this is fine for dev, not prod)
-hashed_passwords = stauth.Hasher(passwords).generate()
+hashed_passwords = Hasher(passwords).generate()
 
 credentials = {
     "usernames": {
@@ -24,12 +25,13 @@ credentials = {
     }
 }
 
-authenticator = stauth.Authenticate(
-    credentials,
-    "optrade_cookie",  # cookie name
-    "optrade_signature",  # random string for security
-    cookie_expiry_days=30
+authenticator = Authenticate(
+    {'usernames': {
+        usernames[0]: {'name': names[0], 'password': hashed_passwords[0]}
+    }},
+    'some_cookie_name', 'some_signature_key', cookie_expiry_days=30
 )
+
 
 name, authentication_status, username = authenticator.login("Login", "main")
 
