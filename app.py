@@ -225,7 +225,7 @@ def scanner_tab():
 
     if st.button("Generate Report"):
         st.session_state.all_trades.clear()
-        companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU"]
+        companies = ["TSLA", "AMZN", "AMD", "PLTR", "RBLX", "LULU", "ABM", "MANU"]
 
         for company in companies:
             try:
