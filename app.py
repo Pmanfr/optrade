@@ -209,7 +209,80 @@ def get_earnings_date(symbol):
         print(f"Error fetching earnings for {symbol}: {e}")
         return None
 
-
+def get_major_economic_events():
+    """Get major economic events for the week that could affect options volatility"""
+    try:
+        api_key = "eZQ1PiKHaSazbMk9zIcYOQ==L80sp50rXpuPuFWx"  # Using your existing API Ninjas key
+        headers = {
+            'X-Api-Key': api_key
+        }
+        
+        # Get current date and end of week
+        from datetime import datetime, timedelta
+        today = datetime.now()
+        end_of_week = today + timedelta(days=(6 - today.weekday()))  # Next Sunday
+        
+        # Format dates for API
+        start_date = today.strftime('%Y-%m-%d')
+        end_date = end_of_week.strftime('%Y-%m-%d')
+        
+        url = f"https://api.api-ninjas.com/v1/economiccalendar?from={start_date}&to={end_date}"
+        
+        print(f"Requesting economic events: {url}")  # Debug print
+        
+        response = requests.get(url, headers=headers)
+        
+        print(f"Economic events response status: {response.status_code}")  # Debug print
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Filter for major events that affect volatility
+            major_events = []
+            high_impact_keywords = [
+                'fed', 'federal reserve', 'interest rate', 'fomc', 'powell',
+                'inflation', 'cpi', 'ppi', 'pce', 'core inflation',
+                'employment', 'unemployment', 'jobs', 'nonfarm', 'payroll',
+                'gdp', 'gross domestic product',
+                'retail sales', 'consumer spending',
+                'trade', 'tariff', 'trade balance',
+                'manufacturing', 'ism manufacturing',
+                'housing', 'home sales', 'building permits',
+                'consumer confidence', 'consumer sentiment'
+            ]
+            
+            for event in data:
+                if isinstance(event, dict):
+                    event_name = event.get('event', '').lower()
+                    country = event.get('country', '')
+                    
+                    # Focus on US events and major impact events
+                    if country == 'US' or any(keyword in event_name for keyword in high_impact_keywords):
+                        # Parse the date
+                        try:
+                            event_date = datetime.strptime(event.get('date', ''), '%Y-%m-%d %H:%M:%S')
+                            major_events.append({
+                                'date': event_date,
+                                'event': event.get('event', ''),
+                                'country': event.get('country', ''),
+                                'actual': event.get('actual', ''),
+                                'forecast': event.get('forecast', ''),
+                                'previous': event.get('previous', '')
+                            })
+                        except (ValueError, TypeError):
+                            continue
+            
+            # Sort by date
+            major_events.sort(key=lambda x: x['date'])
+            return major_events[:10]  # Return top 10 most relevant events
+            
+        else:
+            print(f"Economic events API failed: {response.status_code}")
+            return []
+            
+    except Exception as e:
+        print(f"Error fetching economic events: {e}")
+        return []
 def check_earnings_before_expiry(symbol, expiry_date):
     """Check if earnings occur before or on expiry date"""
     earnings_date = get_earnings_date(symbol)
@@ -299,7 +372,7 @@ def main_app():
         st.write(f"Welcome, {st.session_state.username}!")
     
     # Navigation
-    tab1, tab2, tab3 = st.tabs(["🔍 Scanner", "⭐ Watchlists", "📊 P&L Tracker"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🔍 Scanner", "⭐ Watchlists", "📊 P&L Tracker", "📅 Economic Events"])
     
     with tab1:
         scanner_tab()
@@ -309,6 +382,10 @@ def main_app():
     
     with tab3:
         pnl_tracker_tab()
+        
+    with tab4:
+        economic_events_tab()
+
 
 def scanner_tab():
     st.header("Options Scanner")
@@ -672,6 +749,76 @@ def pnl_tracker_tab():
         with col4:
             overall_win_rate = (overall_wins / (overall_wins + overall_losses) * 100) if (overall_wins + overall_losses) > 0 else 0
             st.metric("Win Rate", f"{overall_win_rate:.1f}%")
+
+
+def economic_events_tab():
+    """Tab for displaying major economic events"""
+    st.header("📅 Major Economic Events This Week")
+    st.write("*Events that could significantly impact options volatility*")
+    
+    if st.button("🔄 Refresh Events", key="refresh_economic_events"):
+        # Clear any cached data
+        if 'economic_events' in st.session_state:
+            del st.session_state['economic_events']
+    
+    # Cache events in session state
+    if 'economic_events' not in st.session_state:
+        with st.spinner("Loading economic events..."):
+            st.session_state.economic_events = get_major_economic_events()
+    
+    events = st.session_state.economic_events
+    
+    if not events:
+        st.info("No major economic events found for this week, or unable to fetch data.")
+        return
+    
+    st.success(f"Found {len(events)} major economic events this week")
+    
+    # Display events
+    for event in events:
+        with st.container():
+            col1, col2, col3 = st.columns([2, 1, 2])
+            
+            with col1:
+                # Format date and time
+                event_date = event['date']
+                date_str = event_date.strftime('%a, %b %d')
+                time_str = event_date.strftime('%I:%M %p')
+                
+                st.write(f"**📅 {date_str} at {time_str}**")
+                st.write(f"🌍 {event['country']}")
+            
+            with col2:
+                # Show volatility impact indicator
+                event_name_lower = event['event'].lower()
+                if any(keyword in event_name_lower for keyword in ['fed', 'fomc', 'powell', 'interest rate']):
+                    st.error("🔴 **HIGH IMPACT**")
+                elif any(keyword in event_name_lower for keyword in ['cpi', 'inflation', 'employment', 'jobs', 'gdp']):
+                    st.warning("🟡 **MEDIUM IMPACT**")
+                else:
+                    st.info("🟢 **LOW-MED IMPACT**")
+            
+            with col3:
+                st.write(f"**{event['event']}**")
+                
+                # Show forecast vs actual if available
+                if event['forecast'] and event['forecast'] != 'null':
+                    st.write(f"📊 Forecast: {event['forecast']}")
+                if event['previous'] and event['previous'] != 'null':
+                    st.write(f"📈 Previous: {event['previous']}")
+                if event['actual'] and event['actual'] != 'null':
+                    st.write(f"✅ Actual: {event['actual']}")
+            
+            st.markdown("---")
+    
+    # Add educational note
+    st.info("""
+    **💡 Trading Tips:**
+    - **High Impact** events can cause significant volatility spikes
+    - **Medium Impact** events may affect sector-specific volatility
+    - Consider avoiding selling puts right before major announcements
+    - Volatility often increases leading up to events and decreases after
+    """)
 
 # Initialize session state
 if 'logged_in' not in st.session_state:
