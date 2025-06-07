@@ -321,6 +321,255 @@ def calculate_pnl(trade_data, current_price):
             status = "Win"
     
     return pnl, status
+#Homepage
+def homescreen():
+    """Beautiful homescreen for OpTrade"""
+    # Custom CSS for the homescreen
+    st.markdown("""
+    <style>
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 4rem 2rem;
+        border-radius: 20px;
+        text-align: center;
+        margin-bottom: 2rem;
+        color: white;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
+    
+    .hero-title {
+        font-size: 4rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .hero-subtitle {
+        font-size: 1.5rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+    }
+    
+    .feature-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        text-align: center;
+        margin: 1rem 0;
+        transition: transform 0.3s ease;
+        border-left: 4px solid #667eea;
+    }
+    
+    .feature-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .feature-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 1rem;
+    }
+    
+    .feature-description {
+        color: #666;
+        line-height: 1.6;
+    }
+    
+    .stats-container {
+        background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        color: white;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    
+    .stat-item {
+        margin: 1rem 0;
+    }
+    
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: bold;
+        display: block;
+    }
+    
+    .stat-label {
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+    
+    .cta-section {
+        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+        padding: 3rem 2rem;
+        border-radius: 20px;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    
+    .cta-title {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 1rem;
+    }
+    
+    .cta-description {
+        font-size: 1.2rem;
+        color: #666;
+        margin-bottom: 2rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Hero Section
+    st.markdown("""
+    <div class="hero-section">
+        <div class="hero-title">📈 OpTrade</div>
+        <div class="hero-subtitle">Advanced Options Trading Scanner & Analytics Platform</div>
+        <p style="font-size: 1.1rem; opacity: 0.8; max-width: 600px; margin: 0 auto;">
+            Discover profitable put-selling opportunities with real-time options scanning, 
+            earnings alerts, and comprehensive P&L tracking. Built for smart traders.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Feature Cards
+    st.markdown("## ✨ **Powerful Features**")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">🔍</div>
+            <div class="feature-title">Smart Scanner</div>
+            <div class="feature-description">
+                Real-time options chain analysis with customizable ROI and 
+                probability filters. Find the best put-selling opportunities instantly.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">⚠️</div>
+            <div class="feature-title">Earnings Alerts</div>
+            <div class="feature-description">
+                Get warned about upcoming earnings that could impact your positions. 
+                Never get caught off-guard by volatility events again.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">📊</div>
+            <div class="feature-title">P&L Tracking</div>
+            <div class="feature-description">
+                Monitor your options performance with detailed profit/loss tracking, 
+                win rates, and portfolio analytics across multiple watchlists.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Additional Features Row
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">⭐</div>
+            <div class="feature-title">Watchlists</div>
+            <div class="feature-description">
+                Organize and track your favorite trades across multiple 
+                customizable watchlists with real-time updates.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">📅</div>
+            <div class="feature-title">Economic Events</div>
+            <div class="feature-description">
+                Stay informed about major economic events that could 
+                impact market volatility and your trading positions.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div class="feature-card">
+            <div class="feature-icon">🎯</div>
+            <div class="feature-title">Black-Scholes</div>
+            <div class="feature-description">
+                Advanced probability calculations using Black-Scholes model 
+                to assess the likelihood of profitable outcomes.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Stats Section
+    st.markdown("""
+    <div class="stats-container">
+        <h2 style="margin-bottom: 2rem;">📈 Platform Stats</h2>
+        <div style="display: flex; justify-content: space-around; flex-wrap: wrap;">
+            <div class="stat-item">
+                <span class="stat-number">12+</span>
+                <span class="stat-label">Major Stocks Tracked</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number">Real-time</span>
+                <span class="stat-label">Market Data</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number">Advanced</span>
+                <span class="stat-label">Analytics</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number">Smart</span>
+                <span class="stat-label">Filtering</span>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Call to Action
+    st.markdown("""
+    <div class="cta-section">
+        <div class="cta-title">Ready to Start Trading Smarter?</div>
+        <div class="cta-description">
+            Join OpTrade today and discover profitable options opportunities with our advanced scanning tools.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Get Started Button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 **Get Started - It's Free!**", 
+                    key="get_started_btn", 
+                    help="Click to register or login",
+                    type="primary"):
+            st.session_state.show_auth = True
+            st.rerun()
+    
+    # Footer
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #666; padding: 2rem 0;">
+        <p><strong>OpTrade</strong> - Advanced Options Trading Platform</p>
+        <p>Built with ❤️ for smart traders | Real-time data • Smart analytics • Profitable insights</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Authentication
 def login_page():
@@ -850,9 +1099,14 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'username' not in st.session_state:
     st.session_state.username = None
-
+if 'show_auth' not in st.session_state:
+    st.session_state.show_auth = False
 # Main app logic
+
 if not st.session_state.logged_in:
-    login_page()
+    if st.session_state.get('show_auth', False):
+        login_page()
+    else:
+        homescreen()
 else:
     main_app()
