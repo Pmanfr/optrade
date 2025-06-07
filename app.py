@@ -666,4 +666,17 @@ def pnl_tracker_tab():
         with col3:
             st.metric("Total Losses", overall_losses)
         with col4:
-            overall_win_rate = (overall_wins / (overall_wins + overall_losses) * 100) if (overall_wins + overall_losses) > 0
+            overall_win_rate = (overall_wins / (overall_wins + overall_losses) * 100) if (overall_wins + overall_losses) > 0 else 0
+            st.metric("Win Rate", f"{overall_win_rate:.1f}%")
+
+# Initialize session state
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+if 'username' not in st.session_state:
+    st.session_state.username = None
+
+# Main app logic
+if not st.session_state.logged_in:
+    login_page()
+else:
+    main_app()
