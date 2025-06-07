@@ -71,15 +71,56 @@ def save_users(users):
     with open('users.json', 'w') as f:
         json.dump(users, f, indent=2)
 
-def load_watchlist(username):
-    if os.path.exists(f'watchlist_{username}.json'):
-        with open(f'watchlist_{username}.json', 'r') as f:
+def load_user_watchlists(username):
+    """Load all watchlists for a user"""
+    if os.path.exists(f'watchlists_{username}.json'):
+        with open(f'watchlists_{username}.json', 'r') as f:
             return json.load(f)
-    return []
+    return {}
 
-def save_watchlist(username, watchlist):
-    with open(f'watchlist_{username}.json', 'w') as f:
-        json.dump(watchlist, f, indent=2)
+def save_user_watchlists(username, watchlists):
+    """Save all watchlists for a user"""
+    with open(f'watchlists_{username}.json', 'w') as f:
+        json.dump(watchlists, f, indent=2)
+
+def create_watchlist(username, watchlist_name):
+    """Create a new watchlist for a user"""
+    watchlists = load_user_watchlists(username)
+    if watchlist_name not in watchlists:
+        watchlists[watchlist_name] = []
+        save_user_watchlists(username, watchlists)
+        return True
+    return False
+
+def delete_watchlist(username, watchlist_name):
+    """Delete a watchlist for a user"""
+    watchlists = load_user_watchlists(username)
+    if watchlist_name in watchlists:
+        del watchlists[watchlist_name]
+        save_user_watchlists(username, watchlists)
+        return True
+    return False
+
+def add_trade_to_watchlist(username, watchlist_name, trade_dict):
+    """Add a trade to a specific watchlist"""
+    watchlists = load_user_watchlists(username)
+    if watchlist_name in watchlists:
+        # Check if trade already exists
+        existing = any(item['optionSymbol'] == trade_dict['optionSymbol'] for item in watchlists[watchlist_name])
+        if not existing:
+            watchlists[watchlist_name].append(trade_dict)
+            save_user_watchlists(username, watchlists)
+            return True
+    return False
+
+def remove_trade_from_watchlist(username, watchlist_name, option_symbol):
+    """Remove a trade from a specific watchlist"""
+    watchlists = load_user_watchlists(username)
+    if watchlist_name in watchlists:
+        watchlists[watchlist_name] = [trade for trade in watchlists[watchlist_name] if trade['optionSymbol'] != option_symbol]
+        save_user_watchlists(username, watchlists)
+        return True
+    return False
 
 def get_current_price(symbol):
     try:
@@ -238,6 +279,8 @@ def login_page():
                 else:
                     users[new_username] = new_password
                     save_users(users)
+                    # Create a default watchlist for new users
+                    create_watchlist(new_username, "Default")
                     st.success("Account created successfully! Please login.")
 
 # Main application
@@ -256,13 +299,13 @@ def main_app():
         st.write(f"Welcome, {st.session_state.username}!")
     
     # Navigation
-    tab1, tab2, tab3 = st.tabs(["🔍 Scanner", "⭐ Watchlist", "📊 P&L Tracker"])
+    tab1, tab2, tab3 = st.tabs(["🔍 Scanner", "⭐ Watchlists", "📊 P&L Tracker"])
     
     with tab1:
         scanner_tab()
     
     with tab2:
-        watchlist_tab()
+        watchlists_tab()
     
     with tab3:
         pnl_tracker_tab()
@@ -355,7 +398,7 @@ def scanner_tab():
                             st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
                         with col2:
                             if st.button("⭐ Add", key=f"add_{trade.optionSymbol}"):
-                                add_to_watchlist(trade)
+                                show_watchlist_selector(trade)
                     trades_buffer = []
 
                 st.markdown(item)  # Print the company header
@@ -376,168 +419,251 @@ def scanner_tab():
                     st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
                 with col2:
                     if st.button("⭐ Add", key=f"add_{trade.optionSymbol}"):
-                        add_to_watchlist(trade)
+                        show_watchlist_selector(trade)
 
-def add_to_watchlist(trade):
-    watchlist = load_watchlist(st.session_state.username)
-    trade_dict = trade.to_dict()
+def show_watchlist_selector(trade):
+    """Show modal to select watchlist for adding trade"""
+    watchlists = load_user_watchlists(st.session_state.username)
     
-    # Check if trade already exists
-    existing = any(item['optionSymbol'] == trade.optionSymbol for item in watchlist)
-    if not existing:
-        watchlist.append(trade_dict)
-        save_watchlist(st.session_state.username, watchlist)
-        st.success(f"Added {trade.optionSymbol} to watchlist!")
-    else:
-        st.warning("Trade already in watchlist!")
-
-def watchlist_tab():
-    st.header("Your Watchlist")
-    
-    watchlist = load_watchlist(st.session_state.username)
-    
-    if not watchlist:
-        st.info("Your watchlist is empty. Add some trades from the scanner!")
+    if not watchlists:
+        st.error("No watchlists found. Please create a watchlist first.")
         return
     
-    # Group by underlying
-    by_underlying = {}
-    for trade in watchlist:
-        underlying = trade['underlying']
-        if underlying not in by_underlying:
-            by_underlying[underlying] = []
-        by_underlying[underlying].append(trade)
-    
-    for underlying, trades in by_underlying.items():
-        # Check for earnings alert for this underlying
-        current_price = get_current_price(underlying)
-        if current_price:
-            # Check if any trade has earnings before expiry
-            has_earnings_alert = False
-            earliest_earnings = None
-            
-            for trade in trades:
-                expiry_date = datetime.fromisoformat(trade['expiration_date'])
-                has_earnings, earnings_date = check_earnings_before_expiry(underlying, expiry_date)
-                if has_earnings:
-                    has_earnings_alert = True
-                    if earliest_earnings is None or earnings_date < earliest_earnings:
-                        earliest_earnings = earnings_date
-            
-            earnings_alert = ""
-            if has_earnings_alert and earliest_earnings:
-                earnings_str = earliest_earnings.strftime('%m/%d')
-                earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
-            
-            st.subheader(f"📈 {underlying} (${current_price:.2f}){earnings_alert}")
-        else:
-            st.subheader(f"📈 {underlying}")
-        
-        for i, trade in enumerate(trades):
-            col1, col2 = st.columns([4, 1])
-            
-            with col1:
-                expiry_date = datetime.fromisoformat(trade['expiration_date']).strftime("%Y-%m-%d")
-                st.write(f"**{trade['optionSymbol']}** | Strike: ${trade['strike']} | Bid: ${trade['bid']} | ROI: {trade['ROI']:.3f} | Expires: {expiry_date}")
-            
-            with col2:
-                if st.button("🗑️ Remove", key=f"remove_{trade['optionSymbol']}_{i}"):
-                    remove_from_watchlist(trade['optionSymbol'])
+    # Use session state to track the selected trade and show selector
+    st.session_state.selected_trade = trade
+    st.session_state.show_selector = True
 
-def remove_from_watchlist(option_symbol):
-    watchlist = load_watchlist(st.session_state.username)
-    watchlist = [trade for trade in watchlist if trade['optionSymbol'] != option_symbol]
-    save_watchlist(st.session_state.username, watchlist)
-    st.success(f"Removed {option_symbol} from watchlist!")
-    st.rerun()
+@st.dialog("Select Watchlist")
+def watchlist_selector_dialog():
+    """Dialog for selecting watchlist"""
+    if 'selected_trade' not in st.session_state:
+        return
+    
+    trade = st.session_state.selected_trade
+    watchlists = load_user_watchlists(st.session_state.username)
+    
+    st.write(f"**Adding:** {trade.optionSymbol}")
+    st.write(f"**Strike:** ${trade.strike} | **ROI:** {trade.ROI:.3f}")
+    
+    selected_watchlist = st.selectbox(
+        "Choose watchlist:",
+        options=list(watchlists.keys()),
+        key="watchlist_selector"
+    )
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Add to Watchlist", key="confirm_add"):
+            if add_trade_to_watchlist(st.session_state.username, selected_watchlist, trade.to_dict()):
+                st.success(f"Added {trade.optionSymbol} to {selected_watchlist}!")
+                st.session_state.selected_trade = None
+                st.session_state.show_selector = False
+                st.rerun()
+            else:
+                st.error("Trade already exists in this watchlist!")
+    
+    with col2:
+        if st.button("Cancel", key="cancel_add"):
+            st.session_state.selected_trade = None
+            st.session_state.show_selector = False
+            st.rerun()
+
+def watchlists_tab():
+    st.header("Your Watchlists")
+    
+    # Show watchlist selector dialog if needed
+    if st.session_state.get('show_selector', False):
+        watchlist_selector_dialog()
+    
+    watchlists = load_user_watchlists(st.session_state.username)
+    
+    # Watchlist management section
+    st.subheader("📋 Manage Watchlists")
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        new_watchlist_name = st.text_input("Create new watchlist:", key="new_watchlist_input")
+    with col2:
+        if st.button("➕ Create", key="create_watchlist_btn"):
+            if new_watchlist_name.strip():
+                if create_watchlist(st.session_state.username, new_watchlist_name.strip()):
+                    st.success(f"Created watchlist: {new_watchlist_name}")
+                    st.rerun()
+                else:
+                    st.error("Watchlist already exists!")
+            else:
+                st.error("Please enter a watchlist name")
+    
+    if not watchlists:
+        st.info("No watchlists found. Create your first watchlist above!")
+        return
+    
+    # Display watchlists
+    for watchlist_name, trades in watchlists.items():
+        with st.expander(f"📂 {watchlist_name} ({len(trades)} trades)", expanded=len(watchlists) == 1):
+            # Delete watchlist button
+            if len(watchlists) > 1:  # Don't allow deleting the last watchlist
+                if st.button(f"🗑️ Delete {watchlist_name}", key=f"delete_watchlist_{watchlist_name}"):
+                    if delete_watchlist(st.session_state.username, watchlist_name):
+                        st.success(f"Deleted watchlist: {watchlist_name}")
+                        st.rerun()
+            
+            if not trades:
+                st.info("This watchlist is empty. Add some trades from the scanner!")
+                continue
+            
+            # Group by underlying
+            by_underlying = {}
+            for trade in trades:
+                underlying = trade['underlying']
+                if underlying not in by_underlying:
+                    by_underlying[underlying] = []
+                by_underlying[underlying].append(trade)
+            
+            for underlying, underlying_trades in by_underlying.items():
+                # Check for earnings alert for this underlying
+                current_price = get_current_price(underlying)
+                if current_price:
+                    # Check if any trade has earnings before expiry
+                    has_earnings_alert = False
+                    earliest_earnings = None
+                    
+                    for trade in underlying_trades:
+                        expiry_date = datetime.fromisoformat(trade['expiration_date'])
+                        has_earnings, earnings_date = check_earnings_before_expiry(underlying, expiry_date)
+                        if has_earnings:
+                            has_earnings_alert = True
+                            if earliest_earnings is None or earnings_date < earliest_earnings:
+                                earliest_earnings = earnings_date
+                    
+                    earnings_alert = ""
+                    if has_earnings_alert and earliest_earnings:
+                        earnings_str = earliest_earnings.strftime('%m/%d')
+                        earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+                    
+                    st.write(f"**📈 {underlying} (${current_price:.2f})**{earnings_alert}")
+                else:
+                    st.write(f"**📈 {underlying}**")
+                
+                for i, trade in enumerate(underlying_trades):
+                    col1, col2 = st.columns([4, 1])
+                    
+                    with col1:
+                        expiry_date = datetime.fromisoformat(trade['expiration_date']).strftime("%Y-%m-%d")
+                        st.write(f"**{trade['optionSymbol']}** | Strike: ${trade['strike']} | Bid: ${trade['bid']} | ROI: {trade['ROI']:.3f} | Expires: {expiry_date}")
+                    
+                    with col2:
+                        if st.button("🗑️", key=f"remove_{watchlist_name}_{trade['optionSymbol']}_{i}"):
+                            if remove_trade_from_watchlist(st.session_state.username, watchlist_name, trade['optionSymbol']):
+                                st.success(f"Removed {trade['optionSymbol']} from {watchlist_name}!")
+                                st.rerun()
 
 def pnl_tracker_tab():
-    st.header("P&L Tracker")
+    st.header("📊 P&L Tracker")
     
-    watchlist = load_watchlist(st.session_state.username)
+    watchlists = load_user_watchlists(st.session_state.username)
     
-    if not watchlist:
-        st.info("No trades in watchlist to track!")
+    if not watchlists:
+        st.info("No watchlists found to track!")
         return
     
-    total_pnl = 0
-    wins = 0
-    losses = 0
+    # Overall summary
+    overall_pnl = 0
+    overall_wins = 0
+    overall_losses = 0
     
-    st.subheader("Expired/Current Positions")
-    
-    for trade in watchlist:
-        expiry_date = datetime.fromisoformat(trade['expiration_date'])
-        days_to_expiry = (expiry_date - datetime.now()).days
-        
-        current_price = get_current_price(trade['underlying'])
-        
-        if current_price is None:
-            st.warning(f"Could not fetch current price for {trade['underlying']}")
+    # Process each watchlist
+    for watchlist_name, trades in watchlists.items():
+        if not trades:
             continue
-        
-        # Check for earnings before expiry
-        has_earnings, earnings_date = check_earnings_before_expiry(trade['underlying'], expiry_date)
-        
-        col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
-        
-        with col1:
-            earnings_warning = ""
-            if has_earnings and days_to_expiry > 0:  # Only show for active positions
-                earnings_str = earnings_date.strftime('%m/%d')
-                earnings_warning = f" ⚠️ Earnings {earnings_str}"
             
-            st.write(f"**{trade['optionSymbol']}**{earnings_warning}")
-            st.write(f"Strike: ${trade['strike']} | Current: ${current_price:.2f}")
+        st.subheader(f"📂 {watchlist_name}")
         
-        with col2:
-            if days_to_expiry <= 0:
-                st.write("🔴 **EXPIRED**")
-                pnl, status = calculate_pnl(trade, current_price)
-                total_pnl += pnl
-                if status == "Win":
-                    wins += 1
+        watchlist_pnl = 0
+        watchlist_wins = 0
+        watchlist_losses = 0
+        
+        for trade in trades:
+            expiry_date = datetime.fromisoformat(trade['expiration_date'])
+            days_to_expiry = (expiry_date - datetime.now()).days
+            
+            current_price = get_current_price(trade['underlying'])
+            
+            if current_price is None:
+                st.warning(f"Could not fetch current price for {trade['underlying']}")
+                continue
+            
+            # Check for earnings before expiry
+            has_earnings, earnings_date = check_earnings_before_expiry(trade['underlying'], expiry_date)
+            
+            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+            
+            with col1:
+                earnings_warning = ""
+                if has_earnings and days_to_expiry > 0:  # Only show for active positions
+                    earnings_str = earnings_date.strftime('%m/%d')
+                    earnings_warning = f" ⚠️ Earnings {earnings_str}"
+                
+                st.write(f"**{trade['optionSymbol']}**{earnings_warning}")
+                st.write(f"Strike: ${trade['strike']} | Current: ${current_price:.2f}")
+            
+            with col2:
+                if days_to_expiry <= 0:
+                    st.write("🔴 **EXPIRED**")
+                    pnl, status = calculate_pnl(trade, current_price)
+                    watchlist_pnl += pnl
+                    overall_pnl += pnl
+                    if status == "Win":
+                        watchlist_wins += 1
+                        overall_wins += 1
+                    else:
+                        watchlist_losses += 1
+                        overall_losses += 1
                 else:
-                    losses += 1
-            else:
-                st.write(f"⏰ {days_to_expiry} days")
-                # For active positions, show unrealized P&L
-                pnl, status = calculate_pnl(trade, current_price)
+                    st.write(f"⏰ {days_to_expiry} days")
+                    # For active positions, show unrealized P&L
+                    pnl, status = calculate_pnl(trade, current_price)
+            
+            with col3:
+                color = "green" if pnl > 0 else "red"
+                st.markdown(f"<span style='color: {color}'>${pnl:.2f}</span>", unsafe_allow_html=True)
+            
+            with col4:
+                if days_to_expiry <= 0:
+                    emoji = "✅" if status == "Win" else "❌"
+                    st.write(f"{emoji} {status}")
+                else:
+                    st.write("📊 Active")
         
+        # Watchlist summary
+        if watchlist_wins > 0 or watchlist_losses > 0:
+            st.markdown("**Watchlist Summary (Expired Only):**")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                color = "green" if watchlist_pnl > 0 else "red"
+                st.markdown(f"P&L: <span style='color: {color}'>${watchlist_pnl:.2f}</span>", unsafe_allow_html=True)
+            with col2:
+                st.write(f"Wins: {watchlist_wins}")
+            with col3:
+                st.write(f"Losses: {watchlist_losses}")
+            with col4:
+                win_rate = (watchlist_wins / (watchlist_wins + watchlist_losses) * 100) if (watchlist_wins + watchlist_losses) > 0 else 0
+                st.write(f"Win Rate: {win_rate:.1f}%")
+        
+        st.markdown("---")
+    
+    # Overall summary
+    if overall_wins > 0 or overall_losses > 0:
+        st.subheader("🎯 Overall Summary")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            color = "green" if overall_pnl > 0 else "red"
+            st.markdown(f"<span style='color: {color}; font-weight: bold; font-size: 1.2em;'>Total P&L: ${overall_pnl:.2f}</span>", unsafe_allow_html=True)
+        with col2:
+            st.metric("Total Wins", overall_wins)
         with col3:
-            color = "green" if pnl > 0 else "red"
-            st.markdown(f"<span style='color: {color}'>${pnl:.2f}</span>", unsafe_allow_html=True)
-        
+            st.metric("Total Losses", overall_losses)
         with col4:
-            if days_to_expiry <= 0:
-                emoji = "✅" if status == "Win" else "❌"
-                st.write(f"{emoji} {status}")
-            else:
-                st.write("📊 Active")
-    
-    # Summary
-    st.markdown("---")
-    st.subheader("Summary (Expired Positions Only)")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Total P&L", f"${total_pnl:.2f}")
-    with col2:
-        st.metric("Wins", wins)
-    with col3:
-        st.metric("Losses", losses)
-    with col4:
-        win_rate = (wins / (wins + losses) * 100) if (wins + losses) > 0 else 0
-        st.metric("Win Rate", f"{win_rate:.1f}%")
-
-# Initialize session state
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-if 'username' not in st.session_state:
-    st.session_state.username = None
-
-# Main app logic
-if not st.session_state.logged_in:
-    login_page()
-else:
-    main_app()
+            overall_win_rate = (overall_wins / (overall_wins + overall_losses) * 100) if (overall_wins + overall_losses) > 0
