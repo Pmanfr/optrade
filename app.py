@@ -313,6 +313,10 @@ def main_app():
 def scanner_tab():
     st.header("Options Scanner")
     
+    # DTE and minimum bid sliders
+    dte_value = st.slider("📅 Days to Expiration (DTE)", min_value=1, max_value=60, value=7, step=1)
+    min_bid = st.slider("💰 Minimum Bid", min_value=0.01, max_value=5.0, value=0.10, step=0.01, format="%.2f")
+    
     # ROI and COP range sliders
     roi_range = st.slider("📈 ROI Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
     cop_range = st.slider("🎯 COP Range", min_value=0.0, max_value=1.0, value=(0.20, 1.0), step=0.01)
@@ -331,8 +335,8 @@ def scanner_tab():
                 quote_data = requests.get(current_price_url).json()
                 current_price = quote_data["mid"][0]
                 
-                # Check for earnings before typical expiry (7 days from now)
-                typical_expiry = datetime.now() + timedelta(days=7)
+                # Check for earnings before typical expiry (use dynamic DTE)
+                typical_expiry = datetime.now() + timedelta(days=dte_value)
                 has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
                 
                 earnings_alert = ""
@@ -342,7 +346,7 @@ def scanner_tab():
                 
                 st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f}){earnings_alert}")
 
-                options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte=7&minBid=0.10&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                 chain_data = requests.get(options_chain_url).json()
 
                 if chain_data.get("s") == "ok":
