@@ -430,11 +430,23 @@ def homescreen():
     <div class="hero-section">
         <div class="hero-title">📈 OpTrade</div>
         <div class="hero-subtitle">Advanced Options Trading Scanner & Analytics Platform</div>
-        <p style="font-size: 1.1rem; opacity: 0.8; max-width: 600px; margin: 0 auto;">
+        <p style="font-size: 1.1rem; opacity: 0.8; max-width: 600px; margin: 0 auto; margin-bottom: 2rem;">
             Discover profitable put-selling opportunities with real-time options scanning, 
             earnings alerts, and comprehensive P&L tracking. Built for smart traders.
         </p>
     </div>
+
+    # Hero CTA Button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🚀 **Get Started - It's Free!**", 
+                    key="hero_get_started_btn", 
+                    help="Click to register or login",
+                    type="primary"):
+            st.session_state.show_auth = True
+            st.rerun()
+    
+    st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
     """, unsafe_allow_html=True)
     
     # Feature Cards
@@ -552,15 +564,6 @@ def homescreen():
     </div>
     """, unsafe_allow_html=True)
     
-    # Get Started Button
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("🚀 **Get Started - It's Free!**", 
-                    key="get_started_btn", 
-                    help="Click to register or login",
-                    type="primary"):
-            st.session_state.show_auth = True
-            st.rerun()
     
     # Footer
     st.markdown("---")
