@@ -213,7 +213,7 @@ def get_major_economic_events():
     """Get major economic events using Finnhub API"""
     try:
         # Get a free API key from https://finnhub.io/register
-        api_key = "YOUR_FINNHUB_API_KEY"  # Replace with your Finnhub API key
+        api_key = "d11u4k1r01qjtpe8vh30d11u4k1r01qjtpe8vh3g"  # Replace with your Finnhub API key
         
         # Get current date and next 7 days
         from datetime import datetime, timedelta
