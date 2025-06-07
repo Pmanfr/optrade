@@ -436,6 +436,8 @@ def homescreen():
         </p>
     </div>
 
+    """, unsafe_allow_html=True)
+    
     # Hero CTA Button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -447,8 +449,6 @@ def homescreen():
             st.rerun()
     
     st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-    """, unsafe_allow_html=True)
-    
     # Feature Cards
     st.markdown("## ✨ **Powerful Features**")
     
