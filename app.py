@@ -321,256 +321,567 @@ def calculate_pnl(trade_data, current_price):
             status = "Win"
     
     return pnl, status
-#Homepage
 def homescreen():
-    """Beautiful homescreen for OpTrade"""
-    # Custom CSS for the homescreen
+    """Modern, sleek homescreen for OpTrade"""
+    
+    # Advanced CSS for modern design
     st.markdown("""
     <style>
-    .hero-section {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 4rem 2rem;
-        border-radius: 20px;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    .stApp {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .main-hero {
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+        padding: 5rem 0;
+        margin: -1rem -1rem 3rem -1rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .main-hero::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            radial-gradient(circle at 20% 20%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+        animation: float 6s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+    }
+    
+    .hero-content {
+        position: relative;
+        z-index: 2;
         text-align: center;
-        margin-bottom: 2rem;
         color: white;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 0 2rem;
     }
     
-    .hero-title {
-        font-size: 4rem;
-        font-weight: bold;
+    .brand-logo {
+        font-size: 4.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         margin-bottom: 1rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        letter-spacing: -2px;
     }
     
-    .hero-subtitle {
+    .hero-tagline {
         font-size: 1.5rem;
-        margin-bottom: 2rem;
+        font-weight: 300;
         opacity: 0.9;
+        margin-bottom: 1rem;
+        line-height: 1.4;
+    }
+    
+    .hero-description {
+        font-size: 1.1rem;
+        opacity: 0.7;
+        margin-bottom: 3rem;
+        line-height: 1.6;
+    }
+    
+    .cta-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 1rem 2.5rem;
+        border-radius: 50px;
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .cta-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+    }
+    
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 2rem;
+        margin: 4rem 0;
+        padding: 0 1rem;
     }
     
     .feature-card {
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        text-align: center;
-        margin: 1rem 0;
-        transition: transform 0.3s ease;
-        border-left: 4px solid #667eea;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 2.5rem;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-10px);
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(102, 126, 234, 0.3);
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     }
     
     .feature-icon {
         font-size: 3rem;
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
+        display: block;
     }
     
     .feature-title {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #333;
+        font-size: 1.4rem;
+        font-weight: 600;
         margin-bottom: 1rem;
+        color: #333;
     }
     
     .feature-description {
         color: #666;
         line-height: 1.6;
+        font-size: 0.95rem;
     }
     
-    .stats-container {
-        background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
-        padding: 2rem;
-        border-radius: 15px;
+    .stats-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        margin: 4rem 0;
+        padding: 4rem 2rem;
+        border-radius: 30px;
         color: white;
         text-align: center;
-        margin: 2rem 0;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stats-section::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: repeating-conic-gradient(
+            from 0deg at 50% 50%,
+            transparent 0deg 30deg,
+            rgba(255, 255, 255, 0.05) 30deg 60deg
+        );
+        animation: rotate 20s linear infinite;
+    }
+    
+    @keyframes rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .stats-content {
+        position: relative;
+        z-index: 2;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 3rem;
+        margin-top: 3rem;
     }
     
     .stat-item {
-        margin: 1rem 0;
+        text-align: center;
     }
     
     .stat-number {
-        font-size: 2.5rem;
-        font-weight: bold;
+        font-size: 3rem;
+        font-weight: 700;
         display: block;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
     
     .stat-label {
         font-size: 1rem;
         opacity: 0.9;
+        font-weight: 400;
     }
     
-    .cta-section {
-        background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-        padding: 3rem 2rem;
-        border-radius: 20px;
+    .benefits-section {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        margin: 4rem 0;
+        padding: 4rem 2rem;
+        border-radius: 30px;
+        color: white;
         text-align: center;
-        margin: 2rem 0;
     }
     
-    .cta-title {
+    .benefits-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 2rem;
+        margin-top: 3rem;
+    }
+    
+    .benefit-item {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 2rem;
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .benefit-item:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .benefit-icon {
         font-size: 2.5rem;
-        font-weight: bold;
-        color: #333;
         margin-bottom: 1rem;
     }
     
-    .cta-description {
+    .benefit-title {
         font-size: 1.2rem;
-        color: #666;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+    
+    .benefit-text {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        line-height: 1.5;
+    }
+    
+    .final-cta {
+        background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+        color: white;
+        padding: 5rem 2rem;
+        margin: 4rem 0;
+        border-radius: 30px;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .final-cta::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(circle at center, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+    }
+    
+    .final-cta-content {
+        position: relative;
+        z-index: 2;
+    }
+    
+    .final-cta h2 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .final-cta p {
+        font-size: 1.2rem;
+        opacity: 0.8;
         margin-bottom: 2rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    
+    .footer {
+        text-align: center;
+        padding: 3rem 0;
+        color: #666;
+        border-top: 1px solid #eee;
+        margin-top: 3rem;
+    }
+    
+    .footer-brand {
+        font-size: 1.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 1rem;
+    }
+    
+    .footer-text {
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+        .feature-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .feature-title {
+            color: #f0f0f0;
+        }
+        
+        .feature-description {
+            color: #a0a0a0;
+        }
+        
+        .footer {
+            border-top-color: #333;
+        }
+    }
+    
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .brand-logo {
+            font-size: 3rem;
+        }
+        
+        .hero-tagline {
+            font-size: 1.2rem;
+        }
+        
+        .features-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        
+        .feature-card {
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Hero Section
+    # Main Hero Section
     st.markdown("""
-    <div class="hero-section">
-        <div class="hero-title">📈 OpTrade</div>
-        <div class="hero-subtitle">Advanced Options Trading Scanner & Analytics Platform</div>
-        <p style="font-size: 1.1rem; opacity: 0.8; max-width: 600px; margin: 0 auto; margin-bottom: 2rem;">
-            Discover profitable put-selling opportunities with real-time options scanning, 
-            earnings alerts, and comprehensive P&L tracking. Built for smart traders.
-        </p>
+    <div class="main-hero">
+        <div class="hero-content">
+            <h1 class="brand-logo">OpTrade</h1>
+            <p class="hero-tagline">Next-Generation Options Intelligence Platform</p>
+            <p class="hero-description">
+                Harness the power of advanced analytics, real-time market data, and intelligent 
+                algorithms to discover profitable put-selling opportunities and maximize your trading potential.
+            </p>
+        </div>
     </div>
-
     """, unsafe_allow_html=True)
     
-    # Hero CTA Button
+    # CTA Button
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("🚀 **Get Started - It's Free!**", 
-                    key="hero_get_started_btn", 
-                    help="Click to register or login",
+        if st.button("🚀 **Start Trading Smarter**", 
+                    key="hero_cta_btn", 
+                    help="Join OpTrade and unlock premium trading insights",
                     type="primary"):
             st.session_state.show_auth = True
             st.rerun()
     
-    st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-    # Feature Cards
-    st.markdown("## ✨ **Powerful Features**")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
+    # Features Section
+    st.markdown("""
+    <div class="features-grid">
         <div class="feature-card">
-            <div class="feature-icon">🔍</div>
-            <div class="feature-title">Smart Scanner</div>
-            <div class="feature-description">
-                Real-time options chain analysis with customizable ROI and 
-                probability filters. Find the best put-selling opportunities instantly.
-            </div>
+            <span class="feature-icon">🎯</span>
+            <h3 class="feature-title">Precision Scanner</h3>
+            <p class="feature-description">
+                AI-powered options chain analysis with advanced probability calculations. 
+                Filter by ROI, Greeks, and volatility to find the perfect trades every time.
+            </p>
         </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
+        
         <div class="feature-card">
-            <div class="feature-icon">⚠️</div>
-            <div class="feature-title">Earnings Alerts</div>
-            <div class="feature-description">
-                Get warned about upcoming earnings that could impact your positions. 
-                Never get caught off-guard by volatility events again.
-            </div>
+            <span class="feature-icon">⚡</span>
+            <h3 class="feature-title">Real-Time Alerts</h3>
+            <p class="feature-description">
+                Stay ahead of market-moving events with earnings calendars, economic indicators, 
+                and volatility warnings that protect your positions.
+            </p>
         </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
+        
         <div class="feature-card">
-            <div class="feature-icon">📊</div>
-            <div class="feature-title">P&L Tracking</div>
-            <div class="feature-description">
-                Monitor your options performance with detailed profit/loss tracking, 
-                win rates, and portfolio analytics across multiple watchlists.
-            </div>
+            <span class="feature-icon">📈</span>
+            <h3 class="feature-title">Smart Analytics</h3>
+            <p class="feature-description">
+                Track performance with detailed P&L analysis, win rate optimization, 
+                and portfolio-wide insights that help you trade like a pro.
+            </p>
         </div>
-        """, unsafe_allow_html=True)
-    
-    # Additional Features Row
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
+        
         <div class="feature-card">
-            <div class="feature-icon">⭐</div>
-            <div class="feature-title">Watchlists</div>
-            <div class="feature-description">
-                Organize and track your favorite trades across multiple 
-                customizable watchlists with real-time updates.
-            </div>
+            <span class="feature-icon">🎛️</span>
+            <h3 class="feature-title">Custom Watchlists</h3>
+            <p class="feature-description">
+                Organize and monitor your strategies across multiple watchlists. 
+                Never miss an opportunity with personalized tracking and alerts.
+            </p>
         </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
+        
         <div class="feature-card">
-            <div class="feature-icon">📅</div>
-            <div class="feature-title">Economic Events</div>
-            <div class="feature-description">
-                Stay informed about major economic events that could 
-                impact market volatility and your trading positions.
-            </div>
+            <span class="feature-icon">🧠</span>
+            <h3 class="feature-title">Black-Scholes Engine</h3>
+            <p class="feature-description">
+                Leverage institutional-grade options pricing models to calculate 
+                probability of profit and optimize your risk-reward ratios.
+            </p>
         </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
+        
         <div class="feature-card">
-            <div class="feature-icon">🎯</div>
-            <div class="feature-title">Black-Scholes</div>
-            <div class="feature-description">
-                Advanced probability calculations using Black-Scholes model 
-                to assess the likelihood of profitable outcomes.
-            </div>
+            <span class="feature-icon">🌐</span>
+            <h3 class="feature-title">Market Intelligence</h3>
+            <p class="feature-description">
+                Access comprehensive market data, economic events, and sector analysis 
+                to make informed decisions in any market condition.
+            </p>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
     
     # Stats Section
     st.markdown("""
-    <div class="stats-container">
-        <h2 style="margin-bottom: 2rem;">📈 Platform Stats</h2>
-        <div style="display: flex; justify-content: space-around; flex-wrap: wrap;">
-            <div class="stat-item">
-                <span class="stat-number">12+</span>
-                <span class="stat-label">Major Stocks Tracked</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number">Real-time</span>
-                <span class="stat-label">Market Data</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number">Advanced</span>
-                <span class="stat-label">Analytics</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-number">Smart</span>
-                <span class="stat-label">Filtering</span>
+    <div class="stats-section">
+        <div class="stats-content">
+            <h2 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;">
+                Trusted by Smart Traders
+            </h2>
+            <p style="font-size: 1.2rem; opacity: 0.9; margin-bottom: 0;">
+                Join thousands of traders who've transformed their options strategies
+            </p>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number">15+</span>
+                    <span class="stat-label">Stocks Tracked</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">Real-Time</span>
+                    <span class="stat-label">Data Feeds</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">Advanced</span>
+                    <span class="stat-label">Algorithms</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">24/7</span>
+                    <span class="stat-label">Market Monitoring</span>
+                </div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Call to Action
+    # Benefits Section
     st.markdown("""
-    <div class="cta-section">
-        <div class="cta-title">Ready to Start Trading Smarter?</div>
-        <div class="cta-description">
-            Join OpTrade today and discover profitable options opportunities with our advanced scanning tools.
+    <div class="benefits-section">
+        <h2 style="font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;">
+            Why Choose OpTrade?
+        </h2>
+        <p style="font-size: 1.2rem; opacity: 0.9;">
+            Transform your trading with professional-grade tools and insights
+        </p>
+        <div class="benefits-grid">
+            <div class="benefit-item">
+                <div class="benefit-icon">💰</div>
+                <div class="benefit-title">Maximize Profits</div>
+                <div class="benefit-text">Find high-ROI opportunities with optimal risk-reward ratios</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">🛡️</div>
+                <div class="benefit-title">Minimize Risk</div>
+                <div class="benefit-text">Advanced warning systems protect your capital from volatility events</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">⏱️</div>
+                <div class="benefit-title">Save Time</div>
+                <div class="benefit-text">Automated scanning replaces hours of manual research</div>
+            </div>
+            <div class="benefit-item">
+                <div class="benefit-icon">📊</div>
+                <div class="benefit-title">Data-Driven</div>
+                <div class="benefit-text">Make decisions based on quantitative analysis, not emotions</div>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
+    # Final CTA Section
+    st.markdown("""
+    <div class="final-cta">
+        <div class="final-cta-content">
+            <h2>Ready to Elevate Your Trading?</h2>
+            <p>
+                Join OpTrade today and discover why smart traders choose data-driven strategies 
+                over guesswork. Start finding profitable opportunities in minutes, not hours.
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Final CTA Button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("🎯 **Get Started Free**", 
+                    key="final_cta_btn", 
+                    help="Create your account and start trading smarter",
+                    type="primary"):
+            st.session_state.show_auth = True
+            st.rerun()
     
     # Footer
-    st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; color: #666; padding: 2rem 0;">
-        <p><strong>OpTrade</strong> - Advanced Options Trading Platform</p>
-        <p>Built with ❤️ for smart traders | Real-time data • Smart analytics • Profitable insights</p>
+    <div class="footer">
+        <div class="footer-brand">OpTrade</div>
+        <div class="footer-text">
+            <strong>Professional Options Trading Platform</strong><br>
+            Advanced Analytics • Real-Time Data • Smart Insights<br>
+            <em>Built for traders who demand excellence</em>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 # Authentication
