@@ -5,30 +5,6 @@ from scipy.stats import norm
 from datetime import datetime, timedelta
 import json
 import os
-import asyncio
-import aiohttp
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
-
-class APIRequestManager:
-    def __init__(self, max_concurrent=45):  # Use 45 to stay safely under 50
-        self.semaphore = threading.Semaphore(max_concurrent)
-    
-    def make_request_with_limit(self, func, *args, **kwargs):
-        """Execute a function with concurrency limiting"""
-        with self.semaphore:
-            return func(*args, **kwargs)
-
-# Create a global instance
-api_manager = APIRequestManager()
-
-def make_request_with_limit(self, func, *args, **kwargs):
-    with self.semaphore:
-        result = func(*args, **kwargs)
-        time.sleep(0.2)  # Add 200ms delay between requests
-        return result
-
 
 # Black-Scholes formula
 def black_scholes_put(current_price, strike, bid, dte, iv):
@@ -146,146 +122,32 @@ def remove_trade_from_watchlist(username, watchlist_name, option_symbol):
         return True
     return False
 
-def process_company_options(company, max_capital, dte_value, min_bid, roi_range, cop_range):
-    """Process a single company's options with concurrency control"""
+def get_current_price(symbol):
     try:
-        # Get current price with rate limiting
-        current_price = api_manager.make_request_with_limit(get_current_price_with_retry, company)
+        current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{symbol}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+        quote_data = requests.get(current_price_url).json()
         
-        if current_price is None:
-            return [f"❌ Could not get price for {company}"]
+        # Debug: Print the response to see structure
+        print(f"API Response for {symbol}: {quote_data}")
         
-        results = []
+        # Try different possible price fields
+        if "mid" in quote_data and quote_data["mid"]:
+            return quote_data["mid"][0]
+        elif "last" in quote_data and quote_data["last"]:
+            return quote_data["last"][0]
+        elif "close" in quote_data and quote_data["close"]:
+            return quote_data["close"][0]
+        elif "ask" in quote_data and "bid" in quote_data:
+            # Calculate mid price from bid/ask
+            if quote_data["ask"] and quote_data["bid"]:
+                ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
+                bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
+                return (ask + bid) / 2
         
-        # Get options chain to find highest strike price
-        options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-        
-        try:
-            # Make options chain request with rate limiting
-            chain_response = api_manager.make_request_with_limit(requests.get, options_chain_url)
-            
-            if chain_response.status_code == 429:
-                retry_after = int(chain_response.headers.get('Retry-After', 2))
-                time.sleep(retry_after)
-                chain_response = api_manager.make_request_with_limit(requests.get, options_chain_url)
-            
-            chain_data = chain_response.json()
-            
-            if chain_data.get("s") == "ok" and chain_data.get('strike'):
-                # Find the highest strike price for this stock
-                highest_strike = max(chain_data['strike'])
-                required_capital = highest_strike * 100
-                
-                if required_capital > max_capital:
-                    return [f"⛔ {company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)"]
-            else:
-                # Fallback to current price method if no options data
-                required_capital = current_price * 100
-                if required_capital > max_capital:
-                    return [f"⛔ {company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)"]
-                highest_strike = current_price
-        
-        except Exception as e:
-            # Fallback to current price method if API call fails
-            required_capital = current_price * 100
-            if required_capital > max_capital:
-                return [f"⛔ {company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)"]
-            highest_strike = current_price
-        
-        # Check for earnings before typical expiry
-        typical_expiry = datetime.now() + timedelta(days=dte_value)
-        has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
-        
-        earnings_alert = ""
-        if has_earnings:
-            earnings_str = earnings_date.strftime('%m/%d')
-            earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
-        
-        results.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
-        
-        # Process options chain
-        if chain_data.get("s") == "ok":
-            valid_trades = []
-            
-            for i in range(len(chain_data['strike'])):
-                strike = chain_data['strike'][i]
-                bid = chain_data['bid'][i]
-                ROI = round((bid * 100) / strike, 3)
-                dte = chain_data['dte'][i]
-                iv = chain_data['iv'][i]
-                COP = black_scholes_put(current_price, strike, bid, dte, iv)
-
-                if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
-                    trade = Trade(
-                        optionSymbol=chain_data['optionSymbol'][i],
-                        underlying=chain_data['underlying'][i],
-                        strike=strike,
-                        bid=bid,
-                        side=chain_data['side'][i],
-                        inTheMoney=chain_data['inTheMoney'][i],
-                        dte=dte,
-                        iv=iv,
-                        ROI=ROI,
-                        COP=COP
-                    )
-                    valid_trades.append(trade)
-            
-            if valid_trades:
-                results.extend(valid_trades)
-            else:
-                results.append(f"⚠️ No trades found matching criteria for {company}")
-        else:
-            results.append(f"⚠️ No options data found for {company}")
-        
-        return results
-        
+        return None
     except Exception as e:
-        return [f"❌ Error processing {company}: {e}"]
-
-def get_current_price_with_retry(symbol, max_retries=3, delay=2):
-    """Enhanced version with better 429 handling"""
-    for attempt in range(max_retries):
-        try:
-            current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{symbol}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-            response = requests.get(current_price_url)
-            
-            # Handle rate limiting
-            if response.status_code == 429:
-                retry_after = int(response.headers.get('Retry-After', delay))
-                print(f"Rate limited for {symbol}, waiting {retry_after} seconds...")
-                time.sleep(retry_after)
-                continue
-            
-            if response.status_code != 200:
-                print(f"HTTP {response.status_code} for {symbol}")
-                if attempt < max_retries - 1:
-                    time.sleep(delay * (2 ** attempt))
-                    continue
-                return None
-                
-            quote_data = response.json()
-            
-            # Try different possible price fields
-            if "mid" in quote_data and quote_data["mid"]:
-                return quote_data["mid"][0]
-            elif "last" in quote_data and quote_data["last"]:
-                return quote_data["last"][0]
-            elif "close" in quote_data and quote_data["close"]:
-                return quote_data["close"][0]
-            elif "ask" in quote_data and "bid" in quote_data:
-                if quote_data["ask"] and quote_data["bid"]:
-                    ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
-                    bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
-                    return (ask + bid) / 2
-            
-            return None
-            
-        except Exception as e:
-            print(f"Error getting price for {symbol} (attempt {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(delay * (2 ** attempt))  # Exponential backoff
-            else:
-                return None
+        print(f"Error getting price for {symbol}: {e}")
+        return None
 
 def get_earnings_date(symbol):
     """Get next earnings date for a symbol using API Ninjas"""
@@ -924,64 +786,102 @@ def scanner_tab():
         
         with st.spinner("🔍 Scanning options markets..."):
             st.session_state.all_trades.clear()
+            companies = ["AAPL", "GOOGL", "PLTR"]            
+            # Track excluded companies for reporting
+            excluded_companies = []
             
-            # Sample companies (you can expand this list)
-            companies = ["AAPL", "MSFT", "NVDA"]
-            
-            # Process companies with controlled concurrency
-            with ThreadPoolExecutor(max_workers=45) as executor:
-                # Submit all company processing tasks
-                future_to_company = {
-                    executor.submit(
-                        process_company_options, 
-                        company, 
-                        max_capital, 
-                        dte_value, 
-                        min_bid, 
-                        roi_range, 
-                        cop_range
-                    ): company 
-                    for company in companies
-                }
-                
-                # Collect results as they complete
-                all_results = []
-                excluded_companies = []
-                
-                for future in as_completed(future_to_company):
-                    company = future_to_company[future]
+            for company in companies:
+                try:
+                    current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                    quote_data = requests.get(current_price_url).json()
+                    current_price = quote_data["mid"][0]
+                    
+                    # Get options chain to find highest strike price
+                    options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                     try:
-                        results = future.result()
+                        chain_data = requests.get(options_chain_url).json()
                         
-                        # Separate excluded companies from valid results
-                        for result in results:
-                            if isinstance(result, str) and result.startswith("⛔"):
-                                excluded_companies.append(result)
-                            else:
-                                all_results.append(result)
-                                
+                        if chain_data.get("s") == "ok" and chain_data.get('strike'):
+                            # Find the highest strike price for this stock
+                            highest_strike = max(chain_data['strike'])
+                            required_capital = highest_strike * 100  # Capital needed for highest strike put
+                            
+                            if required_capital > max_capital:
+                                excluded_companies.append(f"{company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)")
+                                continue  # Skip this company entirely
+                        else:
+                            # Fallback to current price method if no options data
+                            required_capital = current_price * 100
+                            if required_capital > max_capital:
+                                excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)")
+                                continue
+                    
                     except Exception as e:
-                        st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
-                
-                # Add all results to session state
-                st.session_state.all_trades.extend(all_results)
-                
-                # Display excluded companies summary at the end
-                if excluded_companies:
-                    st.session_state.all_trades.append("---")
-                    st.session_state.all_trades.append(f"### 🚫 Excluded Companies (Capital > ${max_capital:,})")
-                    st.session_state.all_trades.extend(excluded_companies)
+                        # Fallback to current price method if API call fails
+                        required_capital = current_price * 100
+                        if required_capital > max_capital:
+                            excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)")
+                            continue
+                    
+                    # Check for earnings before typical expiry (use dynamic DTE)
+                    typical_expiry = datetime.now() + timedelta(days=dte_value)
+                    has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
+                    
+                    earnings_alert = ""
+                    if has_earnings:
+                        earnings_str = earnings_date.strftime('%m/%d')
+                        earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+                    
+                    st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
+                    options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                    chain_data = requests.get(options_chain_url).json()
 
-    # Display trades with add to watchlist option
+                    if chain_data.get("s") == "ok":
+                        for i in range(len(chain_data['strike'])):
+                            strike = chain_data['strike'][i]
+                            bid = chain_data['bid'][i]
+                            ROI = round((bid * 100) / strike, 3)
+                            dte = chain_data['dte'][i]
+                            iv = chain_data['iv'][i]
+                            COP = black_scholes_put(current_price, strike, bid, dte, iv)
+
+                            if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
+                                trade = Trade(
+                                    optionSymbol=chain_data['optionSymbol'][i],
+                                    underlying=chain_data['underlying'][i],
+                                    strike=strike,
+                                    bid=bid,
+                                    side=chain_data['side'][i],
+                                    inTheMoney=chain_data['inTheMoney'][i],
+                                    dte=dte,
+                                    iv=iv,
+                                    ROI=ROI,
+                                    COP=COP
+                                )
+                                st.session_state.all_trades.append(trade)
+                    else:
+                        st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
+
+                except Exception as e:
+                    st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+            
+            # Display excluded companies summary at the end
+            if excluded_companies:
+                st.session_state.all_trades.append("---")
+                st.session_state.all_trades.append(f"### 🚫 Excluded Companies (Capital > ${max_capital:,})")
+                for excluded in excluded_companies:
+                    st.session_state.all_trades.append(f"⛔ {excluded}")
+
+    # Display trades with add to watchlist option (rest of your existing code remains the same)
     if st.session_state.all_trades:
         st.markdown("---")
         sort_filter = st.selectbox("🔃 Sort trades by:", ["ROI", "COP", "x"], index=0)
 
+        current_company = None
         trades_buffer = []
-        
+
         for item in st.session_state.all_trades:
             if isinstance(item, str):
-                # Process any buffered trades before showing the header
                 if trades_buffer:
                     if sort_filter == "ROI":
                         trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
@@ -999,11 +899,10 @@ def scanner_tab():
                                 show_watchlist_selector(trade)
                     trades_buffer = []
 
-                st.markdown(item)  # Print the company header or other string
+                st.markdown(item)  # Print the company header
             else:
                 trades_buffer.append(item)
 
-        # Process any remaining trades in buffer
         if trades_buffer:
             if sort_filter == "ROI":
                 trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
@@ -1368,6 +1267,3 @@ if not st.session_state.logged_in:
         homescreen()
 else:
     main_app()
-
-
-    
