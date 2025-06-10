@@ -649,7 +649,80 @@ def main_app():
     with tab4:
         economic_events_tab()
 
-
+@st.dialog("🎯 Customize Your Trade Search")
+def trade_filter_modal():
+    """Modal dialog for trade filtering options"""
+    st.markdown("### Set Your Trading Parameters")
+    
+    # Capital input
+    max_capital = st.number_input(
+        "💰 Maximum Capital to Invest ($)", 
+        min_value=100, 
+        max_value=100000, 
+        value=st.session_state.get('filter_capital', 5000), 
+        step=100,
+        help="Companies requiring more capital than this amount will be excluded from the search",
+        key="modal_capital"
+    )
+    
+    # DTE slider
+    dte_value = st.slider(
+        "📅 Days to Expiration (DTE)", 
+        min_value=1, 
+        max_value=60, 
+        value=st.session_state.get('filter_dte', 7), 
+        step=1,
+        key="modal_dte"
+    )
+    
+    # Minimum bid slider
+    min_bid = st.slider(
+        "💰 Minimum Bid", 
+        min_value=0.01, 
+        max_value=5.0, 
+        value=st.session_state.get('filter_min_bid', 0.10), 
+        step=0.01, 
+        format="%.2f",
+        key="modal_min_bid"
+    )
+    
+    # ROI range slider
+    roi_range = st.slider(
+        "📈 ROI Range", 
+        min_value=0.0, 
+        max_value=1.0, 
+        value=st.session_state.get('filter_roi_range', (0.20, 1.0)), 
+        step=0.01,
+        key="modal_roi_range"
+    )
+    
+    # COP range slider
+    cop_range = st.slider(
+        "🎯 COP Range", 
+        min_value=0.0, 
+        max_value=1.0, 
+        value=st.session_state.get('filter_cop_range', (0.20, 1.0)), 
+        step=0.01,
+        key="modal_cop_range"
+    )
+    
+    st.markdown("---")
+    
+    # Buttons
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🚀 Generate Report", key="modal_generate", type="primary"):
+            # Save filter values to session state
+            st.session_state.filter_capital = max_capital
+            st.session_state.filter_dte = dte_value
+            st.session_state.filter_min_bid = min_bid
+            st.session_state.filter_roi_range = roi_range
+            st.session_state.filter_cop_range = cop_range
+            st.session_state.generate_report = True
+            st.session_state.show_filter_modal = False
+            st.rerun()
+            
 def scanner_tab():
     st.header("Options Scanner")
     
@@ -1196,79 +1269,7 @@ if not st.session_state.logged_in:
 else:
     main_app()
 
-@st.dialog("🎯 Customize Your Trade Search")
-def trade_filter_modal():
-    """Modal dialog for trade filtering options"""
-    st.markdown("### Set Your Trading Parameters")
-    
-    # Capital input
-    max_capital = st.number_input(
-        "💰 Maximum Capital to Invest ($)", 
-        min_value=100, 
-        max_value=100000, 
-        value=st.session_state.get('filter_capital', 5000), 
-        step=100,
-        help="Companies requiring more capital than this amount will be excluded from the search",
-        key="modal_capital"
-    )
-    
-    # DTE slider
-    dte_value = st.slider(
-        "📅 Days to Expiration (DTE)", 
-        min_value=1, 
-        max_value=60, 
-        value=st.session_state.get('filter_dte', 7), 
-        step=1,
-        key="modal_dte"
-    )
-    
-    # Minimum bid slider
-    min_bid = st.slider(
-        "💰 Minimum Bid", 
-        min_value=0.01, 
-        max_value=5.0, 
-        value=st.session_state.get('filter_min_bid', 0.10), 
-        step=0.01, 
-        format="%.2f",
-        key="modal_min_bid"
-    )
-    
-    # ROI range slider
-    roi_range = st.slider(
-        "📈 ROI Range", 
-        min_value=0.0, 
-        max_value=1.0, 
-        value=st.session_state.get('filter_roi_range', (0.20, 1.0)), 
-        step=0.01,
-        key="modal_roi_range"
-    )
-    
-    # COP range slider
-    cop_range = st.slider(
-        "🎯 COP Range", 
-        min_value=0.0, 
-        max_value=1.0, 
-        value=st.session_state.get('filter_cop_range', (0.20, 1.0)), 
-        step=0.01,
-        key="modal_cop_range"
-    )
-    
-    st.markdown("---")
-    
-    # Buttons
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🚀 Generate Report", key="modal_generate", type="primary"):
-            # Save filter values to session state
-            st.session_state.filter_capital = max_capital
-            st.session_state.filter_dte = dte_value
-            st.session_state.filter_min_bid = min_bid
-            st.session_state.filter_roi_range = roi_range
-            st.session_state.filter_cop_range = cop_range
-            st.session_state.generate_report = True
-            st.session_state.show_filter_modal = False
-            st.rerun()
+
     
     with col2:
         if st.button("❌ Cancel", key="modal_cancel"):
