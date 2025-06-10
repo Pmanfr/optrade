@@ -2,3 +2,4 @@ streamlit
 requests
 scipy
 streamlit-authenticator
+aiohttp
