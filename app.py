@@ -786,7 +786,7 @@ def scanner_tab():
         
         with st.spinner("🔍 Scanning options markets..."):
             st.session_state.all_trades.clear()
-            companies = ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "AVGO", "JPM", "UNH", "XOM", "V", "PG", "JNJ", "MA", "HD", "NFLX", "ABBV", "CRM", "BAC", "KO", "CVX", "COST", "PEP", "TMO", "ORCL", "ACN", "LIN", "MRK", "ABT", "CSCO", "AMD", "DHR", "WMT", "VZ", "ADBE", "NOW", "TXN", "NEE", "COP", "QCOM", "LMND", "RBLX", "OKLO"]             
+            companies = ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "AVGO", "MRK", "ABT", "CSCO", "AMD", "DHR", "WMT", "VZ", "ADBE", "NOW", "TXN", "NEE", "COP", "QCOM", "LMND", "RBLX", "OKLO"]             
             # Track excluded companies for reporting
             excluded_companies = []
             
