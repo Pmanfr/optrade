@@ -688,12 +688,32 @@ def scanner_tab():
                 quote_data = requests.get(current_price_url).json()
                 current_price = quote_data["mid"][0]
                 
-                # NEW CODE: Check if company requires more capital than user is willing to invest
-                required_capital = current_price * 100  # For put selling, you need 100 shares worth of capital
+                # Get options chain to find highest strike price
+                options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                try:
+                    chain_data = requests.get(options_chain_url).json()
+                    
+                    if chain_data.get("s") == "ok" and chain_data.get('strike'):
+                        # Find the highest strike price for this stock
+                        highest_strike = max(chain_data['strike'])
+                        required_capital = highest_strike * 100  # Capital needed for highest strike put
+                        
+                        if required_capital > max_capital:
+                            excluded_companies.append(f"{company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)")
+                            continue  # Skip this company entirely
+                    else:
+                        # Fallback to current price method if no options data
+                        required_capital = current_price * 100
+                        if required_capital > max_capital:
+                            excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)")
+                            continue
                 
-                if required_capital > max_capital:
-                    excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required)")
-                    continue  # Skip this company entirely
+                except Exception as e:
+                    # Fallback to current price method if API call fails
+                    required_capital = current_price * 100
+                    if required_capital > max_capital:
+                        excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)")
+                        continue
                 
                 # Check for earnings before typical expiry (use dynamic DTE)
                 typical_expiry = datetime.now() + timedelta(days=dte_value)
@@ -704,8 +724,7 @@ def scanner_tab():
                     earnings_str = earnings_date.strftime('%m/%d')
                     earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
                 
-                st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f}, Capital Req: ${required_capital:,.0f}){earnings_alert}")
-
+                st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
                 options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                 chain_data = requests.get(options_chain_url).json()
 
