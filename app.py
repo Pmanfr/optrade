@@ -139,50 +139,101 @@ def remove_trade_from_watchlist(username, watchlist_name, option_symbol):
         return True
     return False
 
-def get_current_price_with_retry(symbol, max_retries=3, delay=2):
-    """Enhanced version with better 429 handling"""
-    for attempt in range(max_retries):
+def process_company_options(company, max_capital, dte_value, min_bid, roi_range, cop_range):
+    """Process a single company's options with concurrency control"""
+    try:
+        # Get current price with rate limiting
+        current_price = api_manager.make_request_with_limit(get_current_price_with_retry, company)
+        
+        if current_price is None:
+            return [f"❌ Could not get price for {company}"]
+        
+        results = []
+        
+        # Get options chain to find highest strike price
+        options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+        
         try:
-            current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{symbol}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-            response = requests.get(current_price_url)
+            # Make options chain request with rate limiting
+            chain_response = api_manager.make_request_with_limit(requests.get, options_chain_url)
             
-            # Handle rate limiting
-            if response.status_code == 429:
-                retry_after = int(response.headers.get('Retry-After', delay))
-                print(f"Rate limited for {symbol}, waiting {retry_after} seconds...")
+            if chain_response.status_code == 429:
+                retry_after = int(chain_response.headers.get('Retry-After', 2))
                 time.sleep(retry_after)
-                continue
+                chain_response = api_manager.make_request_with_limit(requests.get, options_chain_url)
             
-            if response.status_code != 200:
-                print(f"HTTP {response.status_code} for {symbol}")
-                if attempt < max_retries - 1:
-                    time.sleep(delay * (2 ** attempt))
-                    continue
-                return None
+            chain_data = chain_response.json()
+            
+            if chain_data.get("s") == "ok" and chain_data.get('strike'):
+                # Find the highest strike price for this stock
+                highest_strike = max(chain_data['strike'])
+                required_capital = highest_strike * 100
                 
-            quote_data = response.json()
-            
-            # Try different possible price fields
-            if "mid" in quote_data and quote_data["mid"]:
-                return quote_data["mid"][0]
-            elif "last" in quote_data and quote_data["last"]:
-                return quote_data["last"][0]
-            elif "close" in quote_data and quote_data["close"]:
-                return quote_data["close"][0]
-            elif "ask" in quote_data and "bid" in quote_data:
-                if quote_data["ask"] and quote_data["bid"]:
-                    ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
-                    bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
-                    return (ask + bid) / 2
-            
-            return None
-            
-        except Exception as e:
-            print(f"Error getting price for {symbol} (attempt {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(delay * (2 ** attempt))  # Exponential backoff
+                if required_capital > max_capital:
+                    return [f"⛔ {company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)"]
             else:
-                return None
+                # Fallback to current price method if no options data
+                required_capital = current_price * 100
+                if required_capital > max_capital:
+                    return [f"⛔ {company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)"]
+                highest_strike = current_price
+        
+        except Exception as e:
+            # Fallback to current price method if API call fails
+            required_capital = current_price * 100
+            if required_capital > max_capital:
+                return [f"⛔ {company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)"]
+            highest_strike = current_price
+        
+        # Check for earnings before typical expiry
+        typical_expiry = datetime.now() + timedelta(days=dte_value)
+        has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
+        
+        earnings_alert = ""
+        if has_earnings:
+            earnings_str = earnings_date.strftime('%m/%d')
+            earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+        
+        results.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
+        
+        # Process options chain
+        if chain_data.get("s") == "ok":
+            valid_trades = []
+            
+            for i in range(len(chain_data['strike'])):
+                strike = chain_data['strike'][i]
+                bid = chain_data['bid'][i]
+                ROI = round((bid * 100) / strike, 3)
+                dte = chain_data['dte'][i]
+                iv = chain_data['iv'][i]
+                COP = black_scholes_put(current_price, strike, bid, dte, iv)
+
+                if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
+                    trade = Trade(
+                        optionSymbol=chain_data['optionSymbol'][i],
+                        underlying=chain_data['underlying'][i],
+                        strike=strike,
+                        bid=bid,
+                        side=chain_data['side'][i],
+                        inTheMoney=chain_data['inTheMoney'][i],
+                        dte=dte,
+                        iv=iv,
+                        ROI=ROI,
+                        COP=COP
+                    )
+                    valid_trades.append(trade)
+            
+            if valid_trades:
+                results.extend(valid_trades)
+            else:
+                results.append(f"⚠️ No trades found matching criteria for {company}")
+        else:
+            results.append(f"⚠️ No options data found for {company}")
+        
+        return results
+        
+    except Exception as e:
+        return [f"❌ Error processing {company}: {e}"]
 
 def get_current_price_with_retry(symbol, max_retries=3, delay=2):
     """Enhanced version with better 429 handling"""
