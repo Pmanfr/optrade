@@ -23,6 +23,13 @@ class APIRequestManager:
 # Create a global instance
 api_manager = APIRequestManager()
 
+def make_request_with_limit(self, func, *args, **kwargs):
+    with self.semaphore:
+        result = func(*args, **kwargs)
+        time.sleep(0.2)  # Add 200ms delay between requests
+        return result
+
+
 # Black-Scholes formula
 def black_scholes_put(current_price, strike, bid, dte, iv):
     T = dte / 365.0
