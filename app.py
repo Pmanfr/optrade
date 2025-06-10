@@ -653,7 +653,17 @@ def main_app():
 def scanner_tab():
     st.header("Options Scanner")
     
-    # DTE and minimum bid sliders
+    # NEW CODE: Add capital input above all sliders
+    max_capital = st.number_input(
+        "💰 Maximum Capital to Invest ($)", 
+        min_value=100, 
+        max_value=100000, 
+        value=5000, 
+        step=100,
+        help="Companies requiring more capital than this amount will be excluded from the search"
+    )
+    
+    # Existing sliders (keep as they are)
     dte_value = st.slider("📅 Days to Expiration (DTE)", min_value=1, max_value=60, value=7, step=1)
     min_bid = st.slider("💰 Minimum Bid", min_value=0.01, max_value=5.0, value=0.10, step=0.01, format="%.2f")
     
@@ -668,11 +678,22 @@ def scanner_tab():
     if st.button("Generate Report"):
         st.session_state.all_trades.clear()
         companies = ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "AVGO", "JPM", "UNH", "XOM", "V", "PG", "JNJ", "MA", "HD", "NFLX", "ABBV", "CRM", "BAC", "KO", "CVX", "COST", "PEP", "TMO", "ORCL", "ACN", "LIN", "MRK", "ABT", "CSCO", "AMD", "DHR", "WMT", "VZ", "ADBE", "NOW", "TXN", "NEE", "COP", "QCOM", "AMGN", "PM", "SPGI", "RTX", "HON", "UNP", "T", "GS", "UBER", "LOW", "INTU", "CAT", "AMAT", "PFE", "SYK", "BKNG", "AXP", "VRTX", "DE", "TJX", "SCHW", "BSX", "AMT", "LMT", "PLD", "MDT", "BLK", "GILD", "ADP", "TMUS", "CI", "SLB", "CB", "REGN", "C", "FI", "MO", "SO", "EOG", "LRCX", "ZTS", "HCA", "PGR", "WM", "DUK", "ITW", "BMY", "APH", "MMC", "NOC", "CME", "KLAC", "PNC", "ICE", "AON", "MSI", "CL", "EQIX", "SNPS", "FCX", "EMR", "TGT", "APD", "MCK", "FDX", "USB", "NSC", "COF", "SHW", "TFC", "ECL", "ROP", "MCO", "EL", "GM", "BDX", "GD", "PSX", "ADI", "HUM", "WELL", "CDNS", "PCAR", "DFS", "MPC", "JCI", "TRV", "GWW", "AJG", "CMG", "CTAS", "ORLY", "NXPI", "SRE", "AEP", "AFL", "AMP", "ALL", "AIG", "PAYX", "ROST", "CARR", "KMB", "D", "OXY", "NUE", "AME", "DXCM", "TEL", "A", "CCI", "FAST", "EXC", "CPRT", "O", "MRNA", "CTSH", "KR", "SPG", "PLTR", "RBLX", "LMND", "U", "OKLO", "CMI", "FTNT", "PWR", "EW", "MLM", "LULU", "LHX", "PCG", "PRU", "VRSK", "VST", "HLT", "EA", "IDXX", "F"]       
+        
+        # NEW CODE: Track excluded companies for reporting
+        excluded_companies = []
+        
         for company in companies:
             try:
                 current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                 quote_data = requests.get(current_price_url).json()
                 current_price = quote_data["mid"][0]
+                
+                # NEW CODE: Check if company requires more capital than user is willing to invest
+                required_capital = current_price * 100  # For put selling, you need 100 shares worth of capital
+                
+                if required_capital > max_capital:
+                    excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required)")
+                    continue  # Skip this company entirely
                 
                 # Check for earnings before typical expiry (use dynamic DTE)
                 typical_expiry = datetime.now() + timedelta(days=dte_value)
@@ -683,7 +704,7 @@ def scanner_tab():
                     earnings_str = earnings_date.strftime('%m/%d')
                     earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
                 
-                st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f}){earnings_alert}")
+                st.session_state.all_trades.append(f"### 📈 {company} (Current Price: ${current_price:.2f}, Capital Req: ${required_capital:,.0f}){earnings_alert}")
 
                 options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                 chain_data = requests.get(options_chain_url).json()
@@ -716,7 +737,15 @@ def scanner_tab():
 
             except Exception as e:
                 st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+        
+        # NEW CODE: Display excluded companies summary at the end
+        if excluded_companies:
+            st.session_state.all_trades.append("---")
+            st.session_state.all_trades.append(f"### 🚫 Excluded Companies (Capital > ${max_capital:,})")
+            for excluded in excluded_companies:
+                st.session_state.all_trades.append(f"⛔ {excluded}")
 
+    # Rest of the function remains the same...
     # Display trades with add to watchlist option
     if st.session_state.all_trades:
         st.markdown("---")
