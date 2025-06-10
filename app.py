@@ -124,101 +124,37 @@ def remove_trade_from_watchlist(username, watchlist_name, option_symbol):
     return False
 
 def get_current_price(symbol, max_retries=3, delay=2):
-    """
-    Improved function to get current stock price with better error handling
-    and response parsing for marketdata.app API
-    """
     for attempt in range(max_retries):
         try:
             current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{symbol}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+            quote_data = requests.get(current_price_url).json()
             
-            # Make the API request
-            response = requests.get(current_price_url, timeout=10)
-            
-            # Check if request was successful
-            if response.status_code != 200:
-                print(f"API returned status code {response.status_code} for {symbol}")
-                if attempt < max_retries - 1:
-                    time.sleep(delay)
-                    continue
-                else:
-                    return None
-            
-            # Parse JSON response
-            quote_data = response.json()
-            
-            # Debug: Print the response structure
+            # Debug: Print the response to see structure
             print(f"API Response for {symbol}: {quote_data}")
             
-            # Check if the API returned an error status
-            if quote_data.get("s") == "error":
-                print(f"API error for {symbol}: {quote_data.get('errmsg', 'Unknown error')}")
-                if attempt < max_retries - 1:
-                    time.sleep(delay)
-                    continue
-                else:
-                    return None
+            # Try different possible price fields
+            if "mid" in quote_data and quote_data["mid"]:
+                return quote_data["mid"][0]
+            elif "last" in quote_data and quote_data["last"]:
+                return quote_data["last"][0]
+            elif "close" in quote_data and quote_data["close"]:
+                return quote_data["close"][0]
+            elif "ask" in quote_data and "bid" in quote_data:
+                # Calculate mid price from bid/ask
+                if quote_data["ask"] and quote_data["bid"]:
+                    ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
+                    bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
+                    return (ask + bid) / 2
             
-            # Function to safely extract price from array or single value
-            def extract_price(value):
-                if value is None:
-                    return None
-                if isinstance(value, (list, tuple)) and len(value) > 0:
-                    return float(value[0]) if value[0] is not None else None
-                if isinstance(value, (int, float)):
-                    return float(value)
-                try:
-                    return float(value)
-                except (ValueError, TypeError):
-                    return None
-            
-            # Try different price fields in order of preference
-            price_fields = ['last', 'mid', 'close', 'mark']
-            
-            for field in price_fields:
-                if field in quote_data:
-                    price = extract_price(quote_data[field])
-                    if price is not None and price > 0:
-                        print(f"Successfully got {field} price for {symbol}: ${price:.2f}")
-                        return price
-            
-            # If no direct price field works, try to calculate from bid/ask
-            if 'ask' in quote_data and 'bid' in quote_data:
-                ask_price = extract_price(quote_data['ask'])
-                bid_price = extract_price(quote_data['bid'])
-                
-                if ask_price is not None and bid_price is not None and ask_price > 0 and bid_price > 0:
-                    mid_price = (ask_price + bid_price) / 2
-                    print(f"Calculated mid price for {symbol}: ${mid_price:.2f} (bid: ${bid_price:.2f}, ask: ${ask_price:.2f})")
-                    return mid_price
-            
-            # If we still don't have a price, log all available fields
-            print(f"No valid price found for {symbol}. Available fields: {list(quote_data.keys())}")
-            
-            # If this wasn't the last attempt, wait and retry
-            if attempt < max_retries - 1:
-                print(f"Retrying in {delay} seconds...")
-                time.sleep(delay)
-            
-        except requests.exceptions.Timeout:
-            print(f"Timeout error for {symbol} (attempt {attempt + 1}/{max_retries})")
-            if attempt < max_retries - 1:
-                time.sleep(delay)
-        except requests.exceptions.RequestException as e:
-            print(f"Request error for {symbol} (attempt {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(delay)
-        except json.JSONDecodeError as e:
-            print(f"JSON parsing error for {symbol} (attempt {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
-                time.sleep(delay)
+            return None
         except Exception as e:
-            print(f"Unexpected error for {symbol} (attempt {attempt + 1}/{max_retries}): {e}")
-            if attempt < max_retries - 1:
+            print(f"Error getting price for {symbol} (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                print(f"Waiting {delay} seconds before retry...")
                 time.sleep(delay)
-    
-    print(f"Failed to get price for {symbol} after {max_retries} attempts")
-    return None
+            else:
+                print(f"Max retries reached for {symbol}")
+                return None
 
 def get_earnings_date(symbol):
     """Get next earnings date for a symbol using API Ninjas"""
@@ -1343,4 +1279,3 @@ else:
 
 
     
-
