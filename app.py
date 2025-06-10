@@ -796,6 +796,7 @@ def scanner_tab():
                     current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                     quote_data = requests.get(current_price_url).json()
                     current_price = quote_data["mid"][0]
+                    print(current_price)
                     
                     # Get options chain to find highest strike price
                     options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
