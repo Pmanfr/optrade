@@ -5,6 +5,7 @@ from scipy.stats import norm
 from datetime import datetime, timedelta
 import json
 import os
+import time
 
 # Black-Scholes formula
 def black_scholes_put(current_price, strike, bid, dte, iv):
@@ -122,32 +123,38 @@ def remove_trade_from_watchlist(username, watchlist_name, option_symbol):
         return True
     return False
 
-def get_current_price(symbol):
-    try:
-        current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{symbol}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-        quote_data = requests.get(current_price_url).json()
-        
-        # Debug: Print the response to see structure
-        print(f"API Response for {symbol}: {quote_data}")
-        
-        # Try different possible price fields
-        if "mid" in quote_data and quote_data["mid"]:
-            return quote_data["mid"][0]
-        elif "last" in quote_data and quote_data["last"]:
-            return quote_data["last"][0]
-        elif "close" in quote_data and quote_data["close"]:
-            return quote_data["close"][0]
-        elif "ask" in quote_data and "bid" in quote_data:
-            # Calculate mid price from bid/ask
-            if quote_data["ask"] and quote_data["bid"]:
-                ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
-                bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
-                return (ask + bid) / 2
-        
-        return None
-    except Exception as e:
-        print(f"Error getting price for {symbol}: {e}")
-        return None
+def get_current_price(symbol, max_retries=3, delay=2):
+    for attempt in range(max_retries):
+        try:
+            current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{symbol}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+            quote_data = requests.get(current_price_url).json()
+            
+            # Debug: Print the response to see structure
+            print(f"API Response for {symbol}: {quote_data}")
+            
+            # Try different possible price fields
+            if "mid" in quote_data and quote_data["mid"]:
+                return quote_data["mid"][0]
+            elif "last" in quote_data and quote_data["last"]:
+                return quote_data["last"][0]
+            elif "close" in quote_data and quote_data["close"]:
+                return quote_data["close"][0]
+            elif "ask" in quote_data and "bid" in quote_data:
+                # Calculate mid price from bid/ask
+                if quote_data["ask"] and quote_data["bid"]:
+                    ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
+                    bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
+                    return (ask + bid) / 2
+            
+            return None
+        except Exception as e:
+            print(f"Error getting price for {symbol} (attempt {attempt + 1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                print(f"Waiting {delay} seconds before retry...")
+                time.sleep(delay)
+            else:
+                print(f"Max retries reached for {symbol}")
+                return None
 
 def get_earnings_date(symbol):
     """Get next earnings date for a symbol using API Ninjas"""
