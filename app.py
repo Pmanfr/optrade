@@ -1271,7 +1271,4 @@ else:
 
 
     
-    with col2:
-        if st.button("❌ Cancel", key="modal_cancel"):
-            st.session_state.show_filter_modal = False
-            st.rerun()
+
