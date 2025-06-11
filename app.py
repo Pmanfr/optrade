@@ -5,6 +5,7 @@ from scipy.stats import norm
 from datetime import datetime, timedelta
 import json
 import os
+import time
 
 # Black-Scholes formula
 def black_scholes_put(current_price, strike, bid, dte, iv):
@@ -293,6 +294,25 @@ def get_major_economic_events():
     except Exception as e:
         print(f"Error fetching economic events: {e}")
         return []
+
+def rate_limited_request(url, max_requests_per_second=45):
+    """Make a rate-limited API request to stay under API limits"""
+    if not hasattr(rate_limited_request, 'last_request_time'):
+        rate_limited_request.last_request_time = 0
+    
+    # Calculate minimum time between requests (leave buffer under 50/sec)
+    min_interval = 1.0 / max_requests_per_second
+    
+    # Wait if necessary
+    elapsed = time.time() - rate_limited_request.last_request_time
+    if elapsed < min_interval:
+        time.sleep(min_interval - elapsed)
+    
+    # Make the request
+    response = requests.get(url)
+    rate_limited_request.last_request_time = time.time()
+    
+    return response
         
 def check_earnings_before_expiry(symbol, expiry_date):
     """Check if earnings occur before or on expiry date"""
@@ -650,116 +670,67 @@ def main_app():
         economic_events_tab()
 
 @st.dialog("🎯 Customize Your Trade Search")
-def trade_filter_modal():
-    """Modal dialog for trade filtering options"""
-    st.markdown("### Set Your Trading Parameters")
+# Toggle UI for Sell Put vs Sell Call
+st.markdown("""
+<style>
+.toggle-container {
+    display: flex;
+    background: #f0f2f6;
+    border-radius: 25px;
+    padding: 4px;
+    margin: 20px 0;
+    width: 300px;
+    position: relative;
+}
+
+.toggle-option {
+    flex: 1;
+    text-align: center;
+    padding: 12px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+    position: relative;
+    z-index: 2;
+}
+
+.toggle-option.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.toggle-option.inactive {
+    color: #666;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Initialize session state for toggle
+if 'trade_type' not in st.session_state:
+    st.session_state.trade_type = 'sell_put'
+
+# Create toggle buttons
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    toggle_col1, toggle_col2 = st.columns(2)
     
-    # NEW: Add the toggle UI at the top
-    st.markdown("""
-    <style>
-    .toggle-container {
-        display: flex;
-        background: #f0f0f0;
-        border-radius: 25px;
-        padding: 4px;
-        margin: 20px 0;
-        width: fit-content;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    .toggle-option {
-        padding: 12px 24px;
-        border-radius: 20px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 600;
-        text-align: center;
-        min-width: 120px;
-    }
-    .toggle-active {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-    .toggle-inactive {
-        background: transparent;
-        color: #666;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Initialize session state for strategy selection
-    if 'selected_strategy' not in st.session_state:
-        st.session_state.selected_strategy = 'sell_put'
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📉 Sell Put", key="toggle_sell_put", 
-                    help="Sell put options for premium collection"):
-            st.session_state.selected_strategy = 'sell_put'
+    with toggle_col1:
+        if st.button("🔻 Sell Put", key="sell_put_toggle", 
+                    help="Sell put options", 
+                    type="primary" if st.session_state.trade_type == 'sell_put' else "secondary"):
+            st.session_state.trade_type = 'sell_put'
             st.rerun()
     
-    with col2:
-        if st.button("📈 Sell Call", key="toggle_sell_call",
-                    help="Sell covered calls on stocks you own"):
-            st.session_state.selected_strategy = 'sell_call'
+    with toggle_col2:
+        if st.button("🔺 Sell Call", key="sell_call_toggle", 
+                    help="Sell call options",
+                    type="primary" if st.session_state.trade_type == 'sell_call' else "secondary"):
+            st.session_state.trade_type = 'sell_call'
             st.rerun()
-    
-    # Show active strategy with styling
-    if st.session_state.selected_strategy == 'sell_put':
-        st.markdown('<div class="toggle-container"><div class="toggle-option toggle-active">📉 Sell Put</div><div class="toggle-option toggle-inactive">📈 Sell Call</div></div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="toggle-container"><div class="toggle-option toggle-inactive">📉 Sell Put</div><div class="toggle-option toggle-active">📈 Sell Call</div></div>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Conditional filters based on selected strategy
-    if st.session_state.selected_strategy == 'sell_put':
-        # EXISTING sell put filters (keep all your current filter code here)
-        max_capital = st.number_input(...)  # your existing code
-        # ... rest of your existing filters
-        
-    else:  # sell_call
-        # NEW: Sell call specific filters
-        st.markdown("### 📈 Covered Call Settings")
-        
-        # Ticker input for owned stocks
-        owned_tickers = st.text_input(
-            "🏢 Add tickers of companies you own 100 shares of:",
-            placeholder="AAPL, MSFT, NVDA (comma separated)",
-            help="Enter the stock symbols you own 100+ shares of",
-            key="owned_tickers_input"
-        )
-        
-        # DTE slider (same as puts)
-        dte_value = st.slider(
-            "📅 Days to Expiration (DTE)", 
-            min_value=1, 
-            max_value=60, 
-            value=st.session_state.get('call_filter_dte', 30), 
-            step=1,
-            key="call_modal_dte"
-        )
-        
-        # ROI range slider (same as puts)
-        roi_range = st.slider(
-            "📈 ROI Range", 
-            min_value=0.0, 
-            max_value=1.0, 
-            value=st.session_state.get('call_filter_roi_range', (0.05, 0.30)), 
-            step=0.01,
-            key="call_modal_roi_range"
-        )
-        
-        # COP range slider (same as puts)
-        cop_range = st.slider(
-            "🎯 COP Range", 
-            min_value=0.0, 
-            max_value=1.0, 
-            value=st.session_state.get('call_filter_cop_range', (0.20, 0.80)), 
-            step=0.01,
-            key="call_modal_cop_range"
-        )
+
+st.markdown("---")
             
 def scanner_tab():
     st.header("Options Scanner")
@@ -790,30 +761,30 @@ def scanner_tab():
             st.session_state.filter_min_bid = 0.10
             st.session_state.filter_roi_range = (0.20, 1.0)
             st.session_state.filter_cop_range = (0.20, 1.0)
+            st.session_state.trade_type_selected = 'sell_put'
             st.session_state.generate_report = True
     
     # Show current filter settings if they exist
-# In the scanner_tab() function, update this section:
-if any(key.startswith('filter_') for key in st.session_state.keys()):
-    with st.expander("📋 Current Filter Settings", expanded=False):
-        strategy = st.session_state.get('selected_strategy', 'sell_put')
-        
-        if strategy == 'sell_put':
-            # Your existing display code
+    if any(key.startswith('filter_') for key in st.session_state.keys()):
+        with st.expander("📋 Current Filter Settings", expanded=False):
             col1, col2, col3 = st.columns(3)
-            # ... existing code
-        else:  # sell_call
-            col1, col2 = st.columns(2)
             with col1:
-                st.write(f"📈 **Strategy:** Covered Calls")
-                owned_tickers = st.session_state.get('owned_tickers_input', 'None specified')
-                st.write(f"🏢 **Owned Tickers:** {owned_tickers}")
-                st.write(f"📅 **DTE:** {st.session_state.get('call_filter_dte', 30)} days")
+                if st.session_state.get('trade_type_selected') == 'sell_call':
+                    owned_tickers = st.session_state.get('owned_tickers', '')
+                    st.write(f"📈 **Owned Tickers:** {owned_tickers if owned_tickers else 'None'}")
+                else:
+                    st.write(f"💰 **Max Capital:** ${st.session_state.get('filter_capital', 5000):,}")
+                st.write(f"📅 **DTE:** {st.session_state.get('filter_dte', 7)} days")
             with col2:
-                roi_range = st.session_state.get('call_filter_roi_range', (0.05, 0.30))
+                if st.session_state.get('trade_type_selected') != 'sell_call':
+                    st.write(f"💰 **Min Bid:** ${st.session_state.get('filter_min_bid', 0.10):.2f}")
+                roi_range = st.session_state.get('filter_roi_range', (0.20, 1.0))
                 st.write(f"📈 **ROI Range:** {roi_range[0]:.2f} - {roi_range[1]:.2f}")
-                cop_range = st.session_state.get('call_filter_cop_range', (0.20, 0.80))
+            with col3:
+                cop_range = st.session_state.get('filter_cop_range', (0.20, 1.0))
                 st.write(f"🎯 **COP Range:** {cop_range[0]:.2f} - {cop_range[1]:.2f}")
+                trade_type = st.session_state.get('trade_type_selected', 'sell_put')
+                st.write(f"📊 **Trade Type:** {trade_type.replace('_', ' ').title()}")
 
     # Use session_state to store trades
     if 'all_trades' not in st.session_state:
@@ -824,101 +795,175 @@ if any(key.startswith('filter_') for key in st.session_state.keys()):
         st.session_state.generate_report = False  # Reset flag
         
         # Get filter values from session state
-        max_capital = st.session_state.get('filter_capital', 5000)
-        dte_value = st.session_state.get('filter_dte', 7)
-        min_bid = st.session_state.get('filter_min_bid', 0.10)
-        roi_range = st.session_state.get('filter_roi_range', (0.20, 1.0))
-        cop_range = st.session_state.get('filter_cop_range', (0.20, 1.0))
+        trade_type = st.session_state.get('trade_type_selected', 'sell_put')
         
-        with st.spinner("🔍 Scanning options markets..."):
-            st.session_state.all_trades.clear()
-            companies = ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "AVGO", "MRK", "ABT", "CSCO", "AMD", "DHR", "WMT", "VZ", "ADBE", "NOW", "TXN", "NEE", "COP", "QCOM", "LMND", "RBLX", "OKLO"]             
-            # Track excluded companies for reporting
-            excluded_companies = []
+        if trade_type == 'sell_put':
+            max_capital = st.session_state.get('filter_capital', 5000)
+            dte_value = st.session_state.get('filter_dte', 7)
+            min_bid = st.session_state.get('filter_min_bid', 0.10)
+            roi_range = st.session_state.get('filter_roi_range', (0.20, 1.0))
+            cop_range = st.session_state.get('filter_cop_range', (0.20, 1.0))
             
-            for company in companies:
-                try:
-                    current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-                    quote_data = requests.get(current_price_url).json()
-                    current_price = quote_data["mid"][0]
-                    
-                    # Get options chain to find highest strike price
-                    options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+            with st.spinner("🔍 Scanning options markets for sell put opportunities..."):
+                st.session_state.all_trades.clear()
+                companies = ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "AVGO", "MRK", "ABT", "CSCO", "AMD", "DHR", "WMT", "VZ", "ADBE", "NOW", "TXN", "NEE", "COP", "QCOM", "LMND", "RBLX", "OKLO"]             
+                # Track excluded companies for reporting
+                excluded_companies = []
+                
+                for company in companies:
                     try:
-                        chain_data = requests.get(options_chain_url).json()
+                        current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                        quote_data = requests.get(current_price_url).json()
+                        current_price = quote_data["mid"][0]
                         
-                        if chain_data.get("s") == "ok" and chain_data.get('strike'):
-                            # Find the highest strike price for this stock
-                            highest_strike = max(chain_data['strike'])
-                            required_capital = highest_strike * 100  # Capital needed for highest strike put
+                        # Get options chain to find highest strike price
+                        options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                        try:
+                            chain_data = requests.get(options_chain_url).json()
                             
-                            if required_capital > max_capital:
-                                excluded_companies.append(f"{company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)")
-                                continue  # Skip this company entirely
-                        else:
-                            # Fallback to current price method if no options data
+                            if chain_data.get("s") == "ok" and chain_data.get('strike'):
+                                # Find the highest strike price for this stock
+                                highest_strike = max(chain_data['strike'])
+                                required_capital = highest_strike * 100  # Capital needed for highest strike put
+                                
+                                if required_capital > max_capital:
+                                    excluded_companies.append(f"{company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)")
+                                    continue  # Skip this company entirely
+                            else:
+                                # Fallback to current price method if no options data
+                                required_capital = current_price * 100
+                                if required_capital > max_capital:
+                                    excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)")
+                                    continue
+                        
+                        except Exception as e:
+                            # Fallback to current price method if API call fails
                             required_capital = current_price * 100
                             if required_capital > max_capital:
-                                excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)")
+                                excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)")
                                 continue
-                    
+                        
+                        # Check for earnings before typical expiry (use dynamic DTE)
+                        typical_expiry = datetime.now() + timedelta(days=dte_value)
+                        has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
+                        
+                        earnings_alert = ""
+                        if has_earnings:
+                            earnings_str = earnings_date.strftime('%m/%d')
+                            earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+                        
+                        st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
+                        options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                        chain_data = requests.get(options_chain_url).json()
+
+                        if chain_data.get("s") == "ok":
+                            for i in range(len(chain_data['strike'])):
+                                strike = chain_data['strike'][i]
+                                bid = chain_data['bid'][i]
+                                ROI = round((bid * 100) / strike, 3)
+                                dte = chain_data['dte'][i]
+                                iv = chain_data['iv'][i]
+                                COP = black_scholes_put(current_price, strike, bid, dte, iv)
+
+                                if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
+                                    trade = Trade(
+                                        optionSymbol=chain_data['optionSymbol'][i],
+                                        underlying=chain_data['underlying'][i],
+                                        strike=strike,
+                                        bid=bid,
+                                        side=chain_data['side'][i],
+                                        inTheMoney=chain_data['inTheMoney'][i],
+                                        dte=dte,
+                                        iv=iv,
+                                        ROI=ROI,
+                                        COP=COP
+                                    )
+                                    st.session_state.all_trades.append(trade)
+                        else:
+                            st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
+
                     except Exception as e:
-                        # Fallback to current price method if API call fails
-                        required_capital = current_price * 100
-                        if required_capital > max_capital:
-                            excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)")
-                            continue
-                    
-                    # Check for earnings before typical expiry (use dynamic DTE)
-                    typical_expiry = datetime.now() + timedelta(days=dte_value)
-                    has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
-                    
-                    earnings_alert = ""
-                    if has_earnings:
-                        earnings_str = earnings_date.strftime('%m/%d')
-                        earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
-                    
-                    st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
-                    options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-                    chain_data = requests.get(options_chain_url).json()
-
-                    if chain_data.get("s") == "ok":
-                        for i in range(len(chain_data['strike'])):
-                            strike = chain_data['strike'][i]
-                            bid = chain_data['bid'][i]
-                            ROI = round((bid * 100) / strike, 3)
-                            dte = chain_data['dte'][i]
-                            iv = chain_data['iv'][i]
-                            COP = black_scholes_put(current_price, strike, bid, dte, iv)
-
-                            if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
-                                trade = Trade(
-                                    optionSymbol=chain_data['optionSymbol'][i],
-                                    underlying=chain_data['underlying'][i],
-                                    strike=strike,
-                                    bid=bid,
-                                    side=chain_data['side'][i],
-                                    inTheMoney=chain_data['inTheMoney'][i],
-                                    dte=dte,
-                                    iv=iv,
-                                    ROI=ROI,
-                                    COP=COP
-                                )
-                                st.session_state.all_trades.append(trade)
-                    else:
-                        st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
-
-                except Exception as e:
-                    st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+                        st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+                
+                # Display excluded companies summary at the end
+                if excluded_companies:
+                    st.session_state.all_trades.append("---")
+                    st.session_state.all_trades.append(f"### 🚫 Excluded Companies (Capital > ${max_capital:,})")
+                    for excluded in excluded_companies:
+                        st.session_state.all_trades.append(f"⛔ {excluded}")
+        
+        else:  # sell_call
+            owned_tickers = st.session_state.get('owned_tickers', '')
+            dte_value = st.session_state.get('filter_dte_call', 30)
+            roi_range = st.session_state.get('filter_roi_range_call', (0.05, 0.50))
+            cop_range = st.session_state.get('filter_cop_range_call', (0.10, 0.80))
             
-            # Display excluded companies summary at the end
-            if excluded_companies:
-                st.session_state.all_trades.append("---")
-                st.session_state.all_trades.append(f"### 🚫 Excluded Companies (Capital > ${max_capital:,})")
-                for excluded in excluded_companies:
-                    st.session_state.all_trades.append(f"⛔ {excluded}")
+            if not owned_tickers.strip():
+                st.warning("⚠️ Please specify the tickers you own in the filter settings!")
+                return
+            
+            # Parse owned tickers
+            ticker_list = [ticker.strip().upper() for ticker in owned_tickers.split(',') if ticker.strip()]
+            
+            with st.spinner("🔍 Scanning call options for your owned stocks..."):
+                st.session_state.all_trades.clear()
+                
+                for company in ticker_list:
+                    try:
+                        current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                        quote_data = requests.get(current_price_url).json()
+                        current_price = quote_data["mid"][0]
+                        
+                        # Check for earnings before typical expiry
+                        typical_expiry = datetime.now() + timedelta(days=dte_value)
+                        has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
+                        
+                        earnings_alert = ""
+                        if has_earnings:
+                            earnings_str = earnings_date.strftime('%m/%d')
+                            earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+                        
+                        st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}){earnings_alert}")
+                        
+                        # Get call options chain (OTM calls for covered calls)
+                        options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&side=call&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                        chain_data = requests.get(options_chain_url).json()
 
-    # Display trades with add to watchlist option (rest of your existing code remains the same)
+                        if chain_data.get("s") == "ok":
+                            for i in range(len(chain_data['strike'])):
+                                strike = chain_data['strike'][i]
+                                bid = chain_data['bid'][i]
+                                
+                                if bid > 0:  # Only consider options with positive bid
+                                    # For calls, ROI is premium / current stock price (since we own the stock)
+                                    ROI = round((bid * 100) / (current_price * 100), 3)
+                                    dte = chain_data['dte'][i]
+                                    iv = chain_data['iv'][i]
+                                    
+                                    # For call options, COP represents probability of finishing OTM (good for us)
+                                    COP = 1 - black_scholes_put(current_price, strike, bid, dte, iv)
+
+                                    if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
+                                        trade = Trade(
+                                            optionSymbol=chain_data['optionSymbol'][i],
+                                            underlying=chain_data['underlying'][i],
+                                            strike=strike,
+                                            bid=bid,
+                                            side='call',  # We're selling calls
+                                            inTheMoney=chain_data['inTheMoney'][i],
+                                            dte=dte,
+                                            iv=iv,
+                                            ROI=ROI,
+                                            COP=COP
+                                        )
+                                        st.session_state.all_trades.append(trade)
+                        else:
+                            st.session_state.all_trades.append(f"⚠️ No call options data found for {company}")
+
+                    except Exception as e:
+                        st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+
+    # Display trades with add to watchlist option
     if st.session_state.all_trades:
         st.markdown("---")
         sort_filter = st.selectbox("🔃 Sort trades by:", ["ROI", "COP", "x"], index=0)
@@ -964,6 +1009,7 @@ if any(key.startswith('filter_') for key in st.session_state.keys()):
                 with col2:
                     if st.button("⭐ Add", key=f"add_{trade.optionSymbol}"):
                         show_watchlist_selector(trade)
+
 
 def show_watchlist_selector(trade):
     """Show modal to select watchlist for adding trade"""
