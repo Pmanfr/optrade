@@ -654,74 +654,112 @@ def trade_filter_modal():
     """Modal dialog for trade filtering options"""
     st.markdown("### Set Your Trading Parameters")
     
-    # Capital input
-    max_capital = st.number_input(
-        "💰 Maximum Capital to Invest ($)", 
-        min_value=100, 
-        max_value=100000, 
-        value=st.session_state.get('filter_capital', 5000), 
-        step=100,
-        help="Companies requiring more capital than this amount will be excluded from the search",
-        key="modal_capital"
-    )
+    # NEW: Add the toggle UI at the top
+    st.markdown("""
+    <style>
+    .toggle-container {
+        display: flex;
+        background: #f0f0f0;
+        border-radius: 25px;
+        padding: 4px;
+        margin: 20px 0;
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .toggle-option {
+        padding: 12px 24px;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        text-align: center;
+        min-width: 120px;
+    }
+    .toggle-active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .toggle-inactive {
+        background: transparent;
+        color: #666;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    # DTE slider
-    dte_value = st.slider(
-        "📅 Days to Expiration (DTE)", 
-        min_value=1, 
-        max_value=60, 
-        value=st.session_state.get('filter_dte', 7), 
-        step=1,
-        key="modal_dte"
-    )
+    # Initialize session state for strategy selection
+    if 'selected_strategy' not in st.session_state:
+        st.session_state.selected_strategy = 'sell_put'
     
-    # Minimum bid slider
-    min_bid = st.slider(
-        "💰 Minimum Bid", 
-        min_value=0.01, 
-        max_value=5.0, 
-        value=st.session_state.get('filter_min_bid', 0.10), 
-        step=0.01, 
-        format="%.2f",
-        key="modal_min_bid"
-    )
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📉 Sell Put", key="toggle_sell_put", 
+                    help="Sell put options for premium collection"):
+            st.session_state.selected_strategy = 'sell_put'
+            st.rerun()
     
-    # ROI range slider
-    roi_range = st.slider(
-        "📈 ROI Range", 
-        min_value=0.0, 
-        max_value=1.0, 
-        value=st.session_state.get('filter_roi_range', (0.20, 1.0)), 
-        step=0.01,
-        key="modal_roi_range"
-    )
+    with col2:
+        if st.button("📈 Sell Call", key="toggle_sell_call",
+                    help="Sell covered calls on stocks you own"):
+            st.session_state.selected_strategy = 'sell_call'
+            st.rerun()
     
-    # COP range slider
-    cop_range = st.slider(
-        "🎯 COP Range", 
-        min_value=0.0, 
-        max_value=1.0, 
-        value=st.session_state.get('filter_cop_range', (0.20, 1.0)), 
-        step=0.01,
-        key="modal_cop_range"
-    )
+    # Show active strategy with styling
+    if st.session_state.selected_strategy == 'sell_put':
+        st.markdown('<div class="toggle-container"><div class="toggle-option toggle-active">📉 Sell Put</div><div class="toggle-option toggle-inactive">📈 Sell Call</div></div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="toggle-container"><div class="toggle-option toggle-inactive">📉 Sell Put</div><div class="toggle-option toggle-active">📈 Sell Call</div></div>', unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Buttons
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🚀 Generate Report", key="modal_generate", type="primary"):
-            # Save filter values to session state
-            st.session_state.filter_capital = max_capital
-            st.session_state.filter_dte = dte_value
-            st.session_state.filter_min_bid = min_bid
-            st.session_state.filter_roi_range = roi_range
-            st.session_state.filter_cop_range = cop_range
-            st.session_state.generate_report = True
-            st.session_state.show_filter_modal = False
-            st.rerun()
+    # Conditional filters based on selected strategy
+    if st.session_state.selected_strategy == 'sell_put':
+        # EXISTING sell put filters (keep all your current filter code here)
+        max_capital = st.number_input(...)  # your existing code
+        # ... rest of your existing filters
+        
+    else:  # sell_call
+        # NEW: Sell call specific filters
+        st.markdown("### 📈 Covered Call Settings")
+        
+        # Ticker input for owned stocks
+        owned_tickers = st.text_input(
+            "🏢 Add tickers of companies you own 100 shares of:",
+            placeholder="AAPL, MSFT, NVDA (comma separated)",
+            help="Enter the stock symbols you own 100+ shares of",
+            key="owned_tickers_input"
+        )
+        
+        # DTE slider (same as puts)
+        dte_value = st.slider(
+            "📅 Days to Expiration (DTE)", 
+            min_value=1, 
+            max_value=60, 
+            value=st.session_state.get('call_filter_dte', 30), 
+            step=1,
+            key="call_modal_dte"
+        )
+        
+        # ROI range slider (same as puts)
+        roi_range = st.slider(
+            "📈 ROI Range", 
+            min_value=0.0, 
+            max_value=1.0, 
+            value=st.session_state.get('call_filter_roi_range', (0.05, 0.30)), 
+            step=0.01,
+            key="call_modal_roi_range"
+        )
+        
+        # COP range slider (same as puts)
+        cop_range = st.slider(
+            "🎯 COP Range", 
+            min_value=0.0, 
+            max_value=1.0, 
+            value=st.session_state.get('call_filter_cop_range', (0.20, 0.80)), 
+            step=0.01,
+            key="call_modal_cop_range"
+        )
             
 def scanner_tab():
     st.header("Options Scanner")
@@ -755,18 +793,26 @@ def scanner_tab():
             st.session_state.generate_report = True
     
     # Show current filter settings if they exist
-    if any(key.startswith('filter_') for key in st.session_state.keys()):
-        with st.expander("📋 Current Filter Settings", expanded=False):
+# In the scanner_tab() function, update this section:
+if any(key.startswith('filter_') for key in st.session_state.keys()):
+    with st.expander("📋 Current Filter Settings", expanded=False):
+        strategy = st.session_state.get('selected_strategy', 'sell_put')
+        
+        if strategy == 'sell_put':
+            # Your existing display code
             col1, col2, col3 = st.columns(3)
+            # ... existing code
+        else:  # sell_call
+            col1, col2 = st.columns(2)
             with col1:
-                st.write(f"💰 **Max Capital:** ${st.session_state.get('filter_capital', 5000):,}")
-                st.write(f"📅 **DTE:** {st.session_state.get('filter_dte', 7)} days")
+                st.write(f"📈 **Strategy:** Covered Calls")
+                owned_tickers = st.session_state.get('owned_tickers_input', 'None specified')
+                st.write(f"🏢 **Owned Tickers:** {owned_tickers}")
+                st.write(f"📅 **DTE:** {st.session_state.get('call_filter_dte', 30)} days")
             with col2:
-                st.write(f"💰 **Min Bid:** ${st.session_state.get('filter_min_bid', 0.10):.2f}")
-                roi_range = st.session_state.get('filter_roi_range', (0.20, 1.0))
+                roi_range = st.session_state.get('call_filter_roi_range', (0.05, 0.30))
                 st.write(f"📈 **ROI Range:** {roi_range[0]:.2f} - {roi_range[1]:.2f}")
-            with col3:
-                cop_range = st.session_state.get('filter_cop_range', (0.20, 1.0))
+                cop_range = st.session_state.get('call_filter_cop_range', (0.20, 0.80))
                 st.write(f"🎯 **COP Range:** {cop_range[0]:.2f} - {cop_range[1]:.2f}")
 
     # Use session_state to store trades
