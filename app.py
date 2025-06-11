@@ -810,103 +810,103 @@ def scanner_tab():
             # Track excluded companies for reporting
             excluded_companies = []
             
-           for company in companies:
-        try:
-            # Define URLs at the start, outside any nested try blocks
-            current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-            options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
-            
-            # Get current price
-            quote_data = rate_limited_request(current_price_url).json()
-            
-            # Extract current price (using your existing logic)
-            current_price = None
-            if "mid" in quote_data and quote_data["mid"]:
-                current_price = quote_data["mid"][0]
-            elif "last" in quote_data and quote_data["last"]:
-                current_price = quote_data["last"][0]
-            elif "close" in quote_data and quote_data["close"]:
-                current_price = quote_data["close"][0]
-            elif "ask" in quote_data and "bid" in quote_data:
-                if quote_data["ask"] and quote_data["bid"]:
-                    ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
-                    bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
-                    current_price = (ask + bid) / 2
-            
-            if current_price is None:
-                st.session_state.all_trades.append(f"❌ Could not get price for {company}")
-                continue
-            
-            # Get options chain to find highest strike price
-            try:
-                chain_data = rate_limited_request(options_chain_url).json()
-                
-                if chain_data.get("s") == "ok" and chain_data.get('strike'):
-                    # Find the highest strike price for this stock
-                    highest_strike = max(chain_data['strike'])
-                    required_capital = highest_strike * 100  # Capital needed for highest strike put
+            for company in companies:
+                try:
+                    # Define URLs at the start, outside any nested try blocks
+                    current_price_url = f"https://api.marketdata.app/v1/stocks/quotes/{company}/?extended=false&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
+                    options_chain_url = f"https://api.marketdata.app/v1/options/chain/{company}/?dte={dte_value}&minBid={min_bid:.2f}&side=put&range=otm&token=emo4YXZySll1d0xmenMxTUVMb0FoN0xfT0Z1N00zRXZrSm1WbEoyVU9Sdz0"
                     
-                    if required_capital > max_capital:
-                        excluded_companies.append(f"{company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)")
-                        continue  # Skip this company entirely
-                else:
-                    # Fallback to current price method if no options data
-                    highest_strike = current_price  # Use current price as fallback
-                    required_capital = current_price * 100
-                    if required_capital > max_capital:
-                        excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)")
+                    # Get current price
+                    quote_data = rate_limited_request(current_price_url).json()
+                    
+                    # Extract current price (using your existing logic)
+                    current_price = None
+                    if "mid" in quote_data and quote_data["mid"]:
+                        current_price = quote_data["mid"][0]
+                    elif "last" in quote_data and quote_data["last"]:
+                        current_price = quote_data["last"][0]
+                    elif "close" in quote_data and quote_data["close"]:
+                        current_price = quote_data["close"][0]
+                    elif "ask" in quote_data and "bid" in quote_data:
+                        if quote_data["ask"] and quote_data["bid"]:
+                            ask = quote_data["ask"][0] if isinstance(quote_data["ask"], list) else quote_data["ask"]
+                            bid = quote_data["bid"][0] if isinstance(quote_data["bid"], list) else quote_data["bid"]
+                            current_price = (ask + bid) / 2
+                    
+                    if current_price is None:
+                        st.session_state.all_trades.append(f"❌ Could not get price for {company}")
                         continue
-            
-            except Exception as e:
-                # Fallback to current price method if API call fails
-                highest_strike = current_price  # Use current price as fallback
-                required_capital = current_price * 100
-                if required_capital > max_capital:
-                    excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)")
-                    continue
-            
-            # Check for earnings before typical expiry (use dynamic DTE)
-            typical_expiry = datetime.now() + timedelta(days=dte_value)
-            has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
-            
-            earnings_alert = ""
-            if has_earnings:
-                earnings_str = earnings_date.strftime('%m/%d')
-                earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
-            
-            st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
-            
-            # Now process the options chain for actual trades
-            chain_data = rate_limited_request(options_chain_url).json()
-
-            if chain_data.get("s") == "ok":
-                for i in range(len(chain_data['strike'])):
-                    strike = chain_data['strike'][i]
-                    bid = chain_data['bid'][i]
-                    ROI = round((bid * 100) / strike, 3)
-                    dte = chain_data['dte'][i]
-                    iv = chain_data['iv'][i]
-                    COP = black_scholes_put(current_price, strike, bid, dte, iv)
-
-                    if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
-                        trade = Trade(
-                            optionSymbol=chain_data['optionSymbol'][i],
-                            underlying=chain_data['underlying'][i],
-                            strike=strike,
-                            bid=bid,
-                            side=chain_data['side'][i],
-                            inTheMoney=chain_data['inTheMoney'][i],
-                            dte=dte,
-                            iv=iv,
-                            ROI=ROI,
-                            COP=COP
-                        )
-                        st.session_state.all_trades.append(trade)
-            else:
-                st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
-
-        except Exception as e:
-            st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
+                    
+                    # Get options chain to find highest strike price
+                    try:
+                        chain_data = rate_limited_request(options_chain_url).json()
+                        
+                        if chain_data.get("s") == "ok" and chain_data.get('strike'):
+                            # Find the highest strike price for this stock
+                            highest_strike = max(chain_data['strike'])
+                            required_capital = highest_strike * 100  # Capital needed for highest strike put
+                            
+                            if required_capital > max_capital:
+                                excluded_companies.append(f"{company} (Highest Strike: ${highest_strike:.2f} = ${required_capital:,.0f} required)")
+                                continue  # Skip this company entirely
+                        else:
+                            # Fallback to current price method if no options data
+                            highest_strike = current_price  # Use current price as fallback
+                            required_capital = current_price * 100
+                            if required_capital > max_capital:
+                                excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - no options data)")
+                                continue
+                    
+                    except Exception as e:
+                        # Fallback to current price method if API call fails
+                        highest_strike = current_price  # Use current price as fallback
+                        required_capital = current_price * 100
+                        if required_capital > max_capital:
+                            excluded_companies.append(f"{company} (${current_price:.2f} = ${required_capital:,.0f} required - API error)")
+                            continue
+                    
+                    # Check for earnings before typical expiry (use dynamic DTE)
+                    typical_expiry = datetime.now() + timedelta(days=dte_value)
+                    has_earnings, earnings_date = check_earnings_before_expiry(company, typical_expiry)
+                    
+                    earnings_alert = ""
+                    if has_earnings:
+                        earnings_str = earnings_date.strftime('%m/%d')
+                        earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
+                    
+                    st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
+                    
+                    # Now process the options chain for actual trades
+                    chain_data = rate_limited_request(options_chain_url).json()
+        
+                    if chain_data.get("s") == "ok":
+                        for i in range(len(chain_data['strike'])):
+                            strike = chain_data['strike'][i]
+                            bid = chain_data['bid'][i]
+                            ROI = round((bid * 100) / strike, 3)
+                            dte = chain_data['dte'][i]
+                            iv = chain_data['iv'][i]
+                            COP = black_scholes_put(current_price, strike, bid, dte, iv)
+        
+                            if roi_range[0] <= ROI <= roi_range[1] and cop_range[0] <= COP <= cop_range[1]:
+                                trade = Trade(
+                                    optionSymbol=chain_data['optionSymbol'][i],
+                                    underlying=chain_data['underlying'][i],
+                                    strike=strike,
+                                    bid=bid,
+                                    side=chain_data['side'][i],
+                                    inTheMoney=chain_data['inTheMoney'][i],
+                                    dte=dte,
+                                    iv=iv,
+                                    ROI=ROI,
+                                    COP=COP
+                                )
+                                st.session_state.all_trades.append(trade)
+                    else:
+                        st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
+        
+                except Exception as e:
+                    st.session_state.all_trades.append(f"❌ Error processing {company}: {e}")
             
             # Display excluded companies summary at the end
             if excluded_companies:
