@@ -751,6 +751,10 @@ def scanner_tab():
         st.session_state.show_filter_modal = False
     if 'generate_report' not in st.session_state:
         st.session_state.generate_report = False
+    if 'all_trades' not in st.session_state:
+        st.session_state.all_trades = []
+    if 'company_info' not in st.session_state:
+        st.session_state.company_info = {}
     
     # Show modal if requested
     if st.session_state.show_filter_modal:
@@ -789,10 +793,6 @@ def scanner_tab():
                 cop_range = st.session_state.get('filter_cop_range', (0.20, 1.0))
                 st.write(f"🎯 **COP Range:** {cop_range[0]:.2f} - {cop_range[1]:.2f}")
 
-    # Use session_state to store trades
-    if 'all_trades' not in st.session_state:
-        st.session_state.all_trades = []
-
     # Generate report logic (triggered by modal or quick scan)
     if st.session_state.generate_report:
         st.session_state.generate_report = False  # Reset flag
@@ -806,7 +806,8 @@ def scanner_tab():
         
         with st.spinner("🔍 Scanning options markets..."):
             st.session_state.all_trades.clear()
-            companies = ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "BRK.B", "AVGO", "LLY", "JPM", "UNH", "XOM", "V", "PG", "JNJ", "MA", "HD", "NFLX", "ABBV", "CRM", "BAC", "ASML", "KO", "CVX", "AZN", "COST", "PEP", "TMO", "ORCL", "ACN", "LIN", "MRK", "ABT", "CSCO", "AMD", "DHR", "WMT", "VZ", "ADBE", "NOW", "TXN", "NEE", "COP", "QCOM", "AMGN", "PM", "SPGI", "RTX", "HON", "UNP", "T", "GS", "UBER", "LOW", "INTU", "CAT", "AMAT", "PFE", "SYK", "BKNG", "AXP", "VRTX", "DE", "TJX", "SCHW", "BSX", "AMT", "LMT", "PLD", "MDT", "BLK", "GILD", "ADP", "TMUS", "CI", "SLB", "CB", "REGN", "C", "FI", "MO", "SO", "EOG", "LRCX", "ZTS", "HCA", "PGR", "WM", "DUK", "ITW", "BMY", "APH", "MMC", "CSF", "NOC", "CME", "KLAC", "PNC", "ICE", "AON", "MSI", "CL", "EQIX", "SNPS", "FCX", "EMR", "TGT", "APD", "MCK", "FDX", "USB", "NSC", "COF", "SHW", "TFC", "ECL", "ROP", "MCO", "EL", "GM", "BDX", "GD", "PSX", "ADI", "HUM", "WELL", "CDNS", "PCAR", "DFS", "MPC", "JCI", "TRV", "GWW", "AJG", "CMG", "CTAS", "ORLY", "NXPI", "SRE", "AEP", "AFL", "AMP", "ALL", "AIG", "PAYX", "ROST", "CARR", "KMB", "D", "OXY", "NUE", "AME", "DXCM", "TEL", "A", "CCI", "FAST", "EXC", "CPRT", "O", "MRNA", "CTSH", "KR", "SPG", "CMI", "FTNT", "PWR", "EW", "MLM", "LULU", "LHX", "PCG", "PRU", "VRSK", "VST", "HLT", "EA", "IDXX", "F", "MNST", "EXR", "XEL", "ANET", "ADSK", "IQV", "WBA", "STZ", "DLR", "KHC", "DD", "PPG", "FANG", "GIS", "AWK", "ADM", "YUM", "WEC", "ED", "CSGP", "ON", "ANSS", "HPQ", "RMD", "BIIB", "DASH", "FTV", "GLW", "KEYS", "ETN", "IRM", "BK", "OTIS", "DOW", "WMB", "ROK", "AVB", "MTB", "PSA", "URI", "FRC", "ODFL", "EQR", "DHI", "VICI", "CTVA", "APTV", "VMC", "KMI", "RSG", "ILMN", "SBAC", "EBAY", "STT", "WY", "HPE", "LEN", "COO", "TROW", "DLTR", "ETR", "TSN", "ULTA", "MPWR", "CNC", "DVA", "NTRS", "DTE", "ARE", "VLO", "PHM", "ES", "WAB", "GPN", "ALGN", "CHD", "TSCO", "CBRE", "HAL", "RCL", "SIVB", "FE", "IR", "ENPH", "TT", "MAR", "DAL", "LVS", "BRO", "STE", "PPL", "AEE", "CMS", "HOLX", "STLD", "FITB", "HIG", "MKTX", "WTW", "TDG", "HBAN", "RF", "CAH", "EIX", "TYL", "CLX", "K", "IP", "CDW", "DGX", "WAT", "EXPD", "AVY", "ZBRA", "NTAP", "EXPE", "LYB", "FSLR", "CINF", "SWKS", "SYF", "PKI", "BALL", "CCL", "J", "NDAQ", "JBHT", "AMCR", "PFG", "LUV", "GRMN", "CFG", "POOL", "KEY", "INCY", "OMC", "VTRS", "FFIV", "UAL", "PEG", "WST", "AKAM", "TTWO", "LKQ", "L", "JKHY", "ZION", "NRG", "DOV", "STX", "MRVI", "VRSN", "TFX", "MOH", "JWN", "SEDG", "MAS", "CPT", "PARA", "AOS", "GNRC", "UDR", "CNP", "LW", "JNPR", "TKO", "IEX", "TPR", "NCLH", "EPAM", "PNR", "CAG", "APA", "GPC", "MTCH", "FMC", "BXP", "WYNN", "NWS", "ROL", "AAL", "NVR", "DVN", "BEN", "NI", "FOXA", "FOX","PLTR", "U", "RBLX", "LMND", "OKLO"]             
+            st.session_state.company_info.clear()
+            companies = ["AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "AMZN", "META", "TSLA", "BRK.B", "AVGO", "LLY", "JPM", "UNH", "XOM", "V", "PG", "JNJ", "MA", "HD", "NFLX", "ABBV", "CRM", "BAC", "ASML", "KO", "CVX", "AZN", "COST", "PEP", "TMO", "ORCL", "ACN", "LIN", "MRK", "ABT", "CSCO", "AMD", "DHR", "WMT", "VZ", "ADBE", "NOW", "TXN", "NEE", "COP", "QCOM", "AMGN", "PM", "SPGI", "RTX", "HON", "UNP", "T", "GS", "UBER", "LOW", "INTU", "CAT", "AMAT", "PFE", "SYK", "BKNG", "AXP", "VRTX", "DE", "TJX", "SCHW", "BSX", "AMT", "LMT", "PLD", "MDT", "BLK", "GILD", "ADP", "TMUS", "CI", "SLB", "CB", "REGN", "C", "FI", "MO", "SO", "EOG", "LRCX", "ZTS", "HCA", "PGR", "WM", "DUK", "ITW", "BMY", "APH", "MMC", "CSF", "NOC", "CME", "KLAC", "PNC", "ICE", "AON", "MSI", "CL", "EQIX", "SNPS", "FCX", "EMR", "TGT", "APD", "MCK", "FDX", "USB", "NSC", "COF", "SHW", "TFC", "ECL", "ROP", "MCO", "EL", "GM", "BDX", "GD", "PSX", "ADI", "HUM", "WELL", "CDNS", "PCAR", "DFS", "MPC", "JCI", "TRV", "GWW", "AJG", "CMG", "CTAS", "ORLY", "NXPI", "SRE", "AEP", "AFL", "AMP", "ALL", "AIG", "PAYX", "ROST", "CARR", "KMB", "D", "OXY", "NUE", "AME", "DXCM", "TEL", "A", "CCI", "FAST", "EXC", "CPRT", "O", "MRNA", "CTSH", "KR", "SPG", "CMI", "FTNT", "PWR", "EW", "MLM", "LULU", "LHX", "PCG", "PRU", "VRSK", "VST", "HLT", "EA", "IDXX", "F", "MNST", "EXR", "XEL", "ANET", "ADSK", "IQV", "WBA", "STZ", "DLR", "KHC", "DD", "PPG", "FANG", "GIS", "AWK", "ADM", "YUM", "WEC", "ED", "CSGP", "ON", "ANSS", "HPQ", "RMD", "BIIB", "DASH", "FTV", "GLW", "KEYS", "ETN", "IRM", "BK", "OTIS", "DOW", "WMB", "ROK", "AVB", "MTB", "PSA", "URI", "FRC", "ODFL", "EQR", "DHI", "VICI", "CTVA", "APTV", "VMC", "KMI", "RSG", "ILMN", "SBAC", "EBAY", "STT", "WY", "HPE", "LEN", "COO", "TROW", "DLTR", "ETR", "TSN", "ULTA", "MPWR", "CNC", "DVA", "NTRS", "DTE", "ARE", "VLO", "PHM", "ES", "WAB", "GPN", "ALGN", "CHD", "TSCO", "CBRE", "HAL", "RCL", "SIVB", "FE", "IR", "ENPH", "TT", "MAR", "DAL", "LVS", "BRO", "STE", "PPL", "AEE", "CMS", "HOLX", "STLD", "FITB", "HIG", "MKTX", "WTW", "TDG", "HBAN", "RF", "CAH", "EIX", "TYL", "CLX", "K", "IP", "CDW", "DGX", "WAT", "EXPD", "AVY", "ZBRA", "NTAP", "EXPE", "LYB", "FSLR", "CINF", "SWKS", "SYF", "PKI", "BALL", "CCL", "J", "NDAQ", "JBHT", "AMCR", "PFG", "LUV", "GRMN", "CFG", "POOL", "KEY", "INCY", "OMC", "VTRS", "FFIV", "UAL", "PEG", "WST", "AKAM", "TTWO", "LKQ", "L", "JKHY", "ZION", "NRG", "DOV", "STX", "MRVI", "VRSN", "TFX", "MOH", "JWN", "SEDG", "MAS", "CPT", "PARA", "AOS", "GNRC", "UDR", "CNP", "LW", "JNPR", "TKO", "IEX", "TPR", "NCLH", "EPAM", "PNR", "CAG", "APA", "GPC", "MTCH", "FMC", "BXP", "WYNN", "NWS", "ROL", "AAL", "NVR", "DVN", "BEN", "NI", "FOXA", "FOX","PLTR", "U", "RBLX", "LMND", "OKLO"]
             # Track excluded companies for reporting
             excluded_companies = []
             
@@ -874,7 +875,12 @@ def scanner_tab():
                         earnings_str = earnings_date.strftime('%m/%d')
                         earnings_alert = f" ⚠️ **EARNINGS {earnings_str}**"
                     
-                    st.session_state.all_trades.append(f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}")
+                    # Store company info separately
+                    st.session_state.company_info[company] = {
+                        'header': f"### 📈 {company} (Current: ${current_price:.2f}, Max Strike: ${highest_strike:.2f}, Max Capital: ${required_capital:,.0f}){earnings_alert}",
+                        'has_trades': False,
+                        'current_price': current_price
+                    }
                     
                     # Now process the options chain for actual trades
                     chain_data = rate_limited_request(options_chain_url).json()
@@ -902,6 +908,7 @@ def scanner_tab():
                                     COP=COP
                                 )
                                 st.session_state.all_trades.append(trade)
+                                st.session_state.company_info[company]['has_trades'] = True
                     else:
                         st.session_state.all_trades.append(f"⚠️ No options data found for {company}")
         
@@ -915,52 +922,59 @@ def scanner_tab():
                 for excluded in excluded_companies:
                     st.session_state.all_trades.append(f"⛔ {excluded}")
 
-    # Display trades with add to watchlist option (rest of your existing code remains the same)
+    # Display trades with global sorting
     if st.session_state.all_trades:
         st.markdown("---")
         sort_filter = st.selectbox("🔃 Sort trades by:", ["ROI", "COP", "x"], index=0)
-
-        current_company = None
-        trades_buffer = []
-
-        for item in st.session_state.all_trades:
-            if isinstance(item, str):
-                if trades_buffer:
-                    if sort_filter == "ROI":
-                        trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
-                    elif sort_filter == "COP":
-                        trades_buffer.sort(key=lambda t: t.COP, reverse=True)
-                    elif sort_filter == "x":
-                        trades_buffer.sort(key=lambda t: t.x, reverse=True)
-
-                    for trade in trades_buffer:
-                        col1, col2 = st.columns([4, 1])
-                        with col1:
-                            st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
-                        with col2:
-                            if st.button("⭐ Add", key=f"add_{trade.optionSymbol}"):
-                                show_watchlist_selector(trade)
-                    trades_buffer = []
-
-                st.markdown(item)  # Print the company header
-            else:
-                trades_buffer.append(item)
-
-        if trades_buffer:
-            if sort_filter == "ROI":
-                trades_buffer.sort(key=lambda t: t.ROI, reverse=True)
-            elif sort_filter == "COP":
-                trades_buffer.sort(key=lambda t: t.COP, reverse=True)
-            elif sort_filter == "x":
-                trades_buffer.sort(key=lambda t: t.x, reverse=True)
-
-            for trade in trades_buffer:
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
-                with col2:
-                    if st.button("⭐ Add", key=f"add_{trade.optionSymbol}"):
-                        show_watchlist_selector(trade)
+        
+        # Separate trades from non-trade items
+        valid_trades = [item for item in st.session_state.all_trades if isinstance(item, Trade)]
+        info_messages = [item for item in st.session_state.all_trades if isinstance(item, str)]
+        
+        # Sort all valid trades globally
+        if sort_filter == "ROI":
+            valid_trades.sort(key=lambda t: t.ROI, reverse=True)
+        elif sort_filter == "COP":
+            valid_trades.sort(key=lambda t: t.COP, reverse=True)
+        elif sort_filter == "x":
+            valid_trades.sort(key=lambda t: t.x, reverse=True)
+        
+        # Display sorted trades with company headers
+        displayed_companies = set()
+        
+        # First, display companies with trades (in sorted order)
+        for trade in valid_trades:
+            company = trade.underlying
+            if company not in displayed_companies:
+                if company in st.session_state.company_info:
+                    st.markdown(st.session_state.company_info[company]['header'])
+                displayed_companies.add(company)
+            
+            # Display the trade
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(f"<pre>{trade}</pre>", unsafe_allow_html=True)
+            with col2:
+                if st.button("⭐ Add", key=f"add_{trade.optionSymbol}"):
+                    show_watchlist_selector(trade)
+        
+        # Then display companies without trades at the bottom
+        st.markdown("---")
+        companies_without_trades = [
+            company for company, info in st.session_state.company_info.items() 
+            if not info['has_trades'] and company not in displayed_companies
+        ]
+        
+        if companies_without_trades:
+            st.markdown("### Companies Without Valid Trades")
+            for company in companies_without_trades:
+                st.markdown(st.session_state.company_info[company]['header'])
+        
+        # Display any error/info messages at the very bottom
+        if info_messages:
+            st.markdown("---")
+            for message in info_messages:
+                st.markdown(message)
 
 def show_watchlist_selector(trade):
     """Show modal to select watchlist for adding trade"""
